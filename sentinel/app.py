@@ -308,17 +308,21 @@ async def list_sessions():
 @app.get("/sentinel/sessions/{session_id}/explain")
 async def explain_session(session_id: str):
     """Explainability API for compliance and auditing."""
-    state = await threat_bus.get_session(session_id)
-    if not state or not state.event_history:
+    if session_id not in threat_bus.sessions:
+        raise HTTPException(status_code=404, detail="Session not found or no events recorded.")
+    
+    state = threat_bus.sessions[session_id]
+    if not state.events:
         raise HTTPException(status_code=404, detail="Session not found or no events recorded.")
         
-    last_event = state.event_history[-1]
+    last_event = state.events[-1]
+    event_dict = last_event.to_dict() if hasattr(last_event, 'to_dict') else last_event
     
     return {
-        "decision": last_event.get("action", "UNKNOWN"),
-        "primary_reason": last_event.get("threat_type", "UNKNOWN"),
-        "evidence": last_event.get("evidence", {}),
-        "human_readable": last_event.get("explanation", {}).get("summary", ""),
+        "decision": event_dict.get("action", "UNKNOWN"),
+        "primary_reason": event_dict.get("threat_type", "UNKNOWN"),
+        "evidence": event_dict.get("evidence", {}),
+        "human_readable": event_dict.get("explanation", {}).get("summary", ""),
         "regulatory_reference": "RBI IT Framework 6.4.2 — Input Validation Controls"
     }
 

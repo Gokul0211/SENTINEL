@@ -97,6 +97,7 @@ class SessionState:
     def to_dict(self) -> dict:
         return {
             "session_id": self.session_id,
+            "turn_count": len(self.turns),
             "turns": [t.to_dict() if hasattr(t, 'to_dict') else t for t in self.turns],
             "events": [e.to_dict() if hasattr(e, 'to_dict') else e for e in self.events],
             "l1_max": self.l1_max,

@@ -26,9 +26,10 @@ def verify_policy(response: str) -> list[str]:
     # Check forbidden topics
     if "forbidden_topics" in out_pol:
         for topic in out_pol["forbidden_topics"]:
-            # Simple keyword matching for demo. In production, use embeddings/classifier.
+            # Split topic like "guarantee_returns" into keyword stems
             keywords = topic.split("_")
-            if any(kw in resp_lower for kw in keywords):
+            # Use substring matching so "guarantee" matches "guaranteed", etc.
+            if any(any(kw in word for word in resp_lower.split()) for kw in keywords if len(kw) > 3):
                 violations.append(f"Forbidden topic detected: {topic}")
                 
     # Check required disclaimers
