@@ -1,7 +1,7 @@
 import yaml
 import os
 
-POLICY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "sentinel_policy.yaml")
+POLICY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "sentinel_policy.yaml")
 
 def load_policy():
     try:
