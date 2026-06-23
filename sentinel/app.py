@@ -26,7 +26,7 @@ from sentinel.layers.layer2_rag import layer2_ingest, layer2_validate_context, l
 from sentinel.layers.layer3 import layer3_check, L3Result, reset_layer3_state
 from sentinel.layers.layer4_agentic import audit_tool_call
 from sentinel.layers.layer5_output import layer5_scan_output
-from sentinel.core.correlation_engine import check_correlations
+from sentinel.core.correlation_engine import check_correlations, reset_correlation_state
 from sentinel.demo_scenarios import run_scenario, SCENARIOS
 
 app = FastAPI(title="SENTINEL", version="0.1.0")
@@ -368,6 +368,7 @@ async def reset():
     """Clear all state — reset dashboard to zero."""
     threat_bus.reset()
     reset_mock_state()
+    reset_correlation_state()
     reset_layer3_state()
 
     # Broadcast reset to all clients
@@ -491,8 +492,6 @@ async def chat_send(request: Request):
     )
     
     session = await threat_bus.get_session(session_id)
-    if not hasattr(session, 'l5_scores'):
-        session.l5_scores = []
     session.l5_scores.append(l5_result.score)
     
     if l5_result.score >= BLOCK_THRESHOLD:
@@ -576,8 +575,6 @@ async def intercept_tool_call(request: Request):
     result = await audit_tool_call(tool_name, parameters, reasoning_trace, session_id, history)
     
     session = await threat_bus.get_session(session_id)
-    if not hasattr(session, 'l4_calls'):
-        session.l4_calls = []
     session.l4_calls.append(result.to_dict())
     
     # Emit event if high risk

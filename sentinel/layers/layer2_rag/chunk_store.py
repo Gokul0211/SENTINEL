@@ -1,11 +1,18 @@
 import uuid
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
 from .provenance import sign_chunk, verify_chunk
 from .instruction_density import calculate_instruction_density
 from sentinel.layers.layer1 import layer1_check
+from sentinel.config import EMBEDDING_MODEL
 
 # In-memory simple store for hackathon (fallback since ChromaDB failed to compile)
 collection = {}
 quarantine_store = {}
+
+# Load embedding model for semantic retrieval (shares the cached instance with L1/L3)
+_retrieval_model = SentenceTransformer(EMBEDDING_MODEL)
 
 async def ingest_chunk(text: str, source: str) -> dict:
     """
@@ -29,6 +36,9 @@ async def ingest_chunk(text: str, source: str) -> dict:
     # 4. Sign chunk for provenance
     signature = sign_chunk(chunk_id, text)
     
+    # 5. Compute embedding for semantic retrieval
+    embedding = _retrieval_model.encode([text])[0].tolist()
+    
     metadata = {
         "source": source,
         "trust_score": trust_score,
@@ -41,6 +51,7 @@ async def ingest_chunk(text: str, source: str) -> dict:
         "chunk_id": chunk_id,
         "text": text,
         "metadata": metadata,
+        "embedding": embedding,
         "quarantined": False,
         "reason": "Ingested successfully"
     }
@@ -58,8 +69,11 @@ async def ingest_chunk(text: str, source: str) -> dict:
 
 def get_all_chunks() -> list:
     """Return all active and quarantined chunks for the dashboard."""
-    active_chunks = list(collection.values())
-    q_chunks = list(quarantine_store.values())
+    # Strip embeddings from the response (they're large and not needed by the UI)
+    def _strip(chunk):
+        return {k: v for k, v in chunk.items() if k != "embedding"}
+    active_chunks = [_strip(c) for c in collection.values()]
+    q_chunks = [_strip(c) for c in quarantine_store.values()]
     return active_chunks + q_chunks
 
 def quarantine_chunk(chunk_id: str) -> bool:
@@ -73,9 +87,23 @@ def quarantine_chunk(chunk_id: str) -> bool:
     return False
         
 def retrieve_and_validate(query: str, top_k: int = 3) -> list:
-    """Retrieve chunks for a query and validate their integrity."""
-    # Since we dropped ChromaDB, we just return the first few active chunks for the demo
-    results = list(collection.values())[:top_k]
+    """Retrieve chunks ranked by cosine similarity to the query and validate their integrity."""
+    if not collection:
+        return []
+
+    # Encode the query
+    query_embedding = _retrieval_model.encode([query])[0].reshape(1, -1)
+
+    # Rank all active chunks by cosine similarity
+    scored = []
+    for chunk_data in collection.values():
+        chunk_emb = np.array(chunk_data["embedding"]).reshape(1, -1)
+        sim = float(cosine_similarity(query_embedding, chunk_emb)[0][0])
+        scored.append((sim, chunk_data))
+
+    # Sort by similarity descending, take top_k
+    scored.sort(key=lambda x: x[0], reverse=True)
+    results = [item for _, item in scored[:top_k]]
     
     validated_chunks = []
     
@@ -106,3 +134,4 @@ def retrieve_and_validate(query: str, top_k: int = 3) -> list:
         })
         
     return validated_chunks
+
