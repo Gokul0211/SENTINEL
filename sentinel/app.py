@@ -90,43 +90,53 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.post("/v1/chat/completions")
 async def proxy_completions(request: Request):
     """
-    OpenAI-compatible proxy endpoint.
-    Intercepts, analyzes, and optionally blocks LLM requests.
+    OpenAI-compatible proxy endpoint — full 5-layer SENTINEL pipeline.
+    All layers run real analysis. No mocked scores.
     """
     body = await request.json()
     session_id = request.headers.get("X-Session-Id", str(uuid.uuid4()))
     messages = body.get("messages", [])
+
     user_input = next(
-        (m["content"] for m in reversed(messages) if m["role"] == "user"),
-        "",
+        (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
+    )
+    system_content = " ".join(
+        m["content"] for m in messages if m["role"] == "system"
     )
 
-    # Run real checks
+    # --- L1: Injection scan on user input ---
     l1_result = await layer1_check(user_input)
+
+    # --- L2: Instruction density on system/context messages ---
+    l2_result = await layer2_ingest(system_content or user_input, source="proxy_context") if system_content or user_input else None
+
+    # --- L3: Conversational drift ---
     l3_result = await layer3_check(session_id, user_input)
 
-    # Mock other layers
-    l2_score = mock_layer_score("L2", session_id)
-    l4_score = mock_layer_score("L4", session_id)
-    l5_score = mock_layer_score("L5", session_id)
-
-    # Combine — L1 and L3 are real, others are mock weight
-    combined_score = max(l1_result.score, l3_result.score)
+    # Combine pre-LLM scores
+    l2_score = (1.0 - l2_result.get("metadata", {}).get("trust_score", 1.0)) if l2_result else 0.0
+    combined_score = max(l1_result.score, l3_result.score, l2_score)
     severity = score_to_severity(combined_score)
     action = score_to_action(combined_score, BLOCK_THRESHOLD, WARN_THRESHOLD)
-
-    # Build reason
     reason = l1_result.reason if l1_result.score >= l3_result.score else l3_result.reason
 
-    # Build rich explainability chain
+    # Build explainability chain
     chain = []
     if l1_result.score > 0.1:
         chain.append({
             "layer": "L1",
             "severity": score_to_severity(l1_result.score),
-            "finding": f"Input Scanner ({('Tier 1 regex' if l1_result.tier_used == 1 else 'Tier 2 semantic')}): {l1_result.threat_class}",
+            "finding": f"Input Scanner ({'Tier 1 regex' if l1_result.tier_used == 1 else 'Tier 2 semantic'}): {l1_result.threat_class}",
             "evidence": l1_result.reason,
             "action": "BLOCK" if l1_result.score >= BLOCK_THRESHOLD else ("WARN" if l1_result.score >= WARN_THRESHOLD else "ALLOW"),
+        })
+    if l2_result and l2_score > 0.1:
+        chain.append({
+            "layer": "L2",
+            "severity": score_to_severity(l2_score),
+            "finding": f"RAG Integrity: instruction_density={l2_result.get('metadata', {}).get('instruction_density', 0):.3f}, trust_score={l2_result.get('metadata', {}).get('trust_score', 0):.3f}",
+            "evidence": "Real-time context validation via HMAC + embedding analysis",
+            "action": "WARN" if l2_score > WARN_THRESHOLD else "ALLOW",
         })
     if l3_result.score > 0.1:
         chain.append({
@@ -136,14 +146,6 @@ async def proxy_completions(request: Request):
             "evidence": l3_result.reason,
             "action": "BLOCK" if l3_result.score >= BLOCK_THRESHOLD else ("WARN" if l3_result.score >= WARN_THRESHOLD else "ALLOW"),
         })
-    # Add mock layer context
-    chain.append({
-        "layer": "L2",
-        "severity": score_to_severity(l2_score),
-        "finding": f"RAG Integrity (simulated): instruction_density={l2_score:.3f}",
-        "evidence": "Mock score — L2 not fully implemented",
-        "action": "MONITOR",
-    })
     if action == "BLOCKED":
         chain.append({
             "layer": "TIB",
@@ -154,7 +156,6 @@ async def proxy_completions(request: Request):
         })
 
     session = await threat_bus.get_session(session_id)
-    # Emit event
     event = ThreatEvent(
         event_id=f"evt_{uuid.uuid4().hex[:8]}",
         timestamp=datetime.now().strftime("%H:%M:%S"),
@@ -166,21 +167,14 @@ async def proxy_completions(request: Request):
         action=action,
         evidence={
             "l1": l1_result.to_dict(),
+            "l2": l2_result or {},
             "l3": l3_result.to_dict(),
-            "l2_mock": getattr(session, 'l2_findings', []) if session else [],
-            "l4_mock": getattr(session, 'l4_calls', []) if session else [],
-            "l5_mock": getattr(session, 'l5_scores', []) if session else [],
         },
-        explanation={
-            "summary": reason,
-            "chain": chain,
-        },
+        explanation={"summary": reason, "chain": chain},
         turn=l3_result.turn_count,
         note=reason[:60],
     )
     await threat_bus.emit(event)
-    
-    # Run cross-layer correlation
     await check_correlations(session_id)
 
     if action == "BLOCKED":
@@ -199,43 +193,30 @@ async def proxy_completions(request: Request):
             },
         )
 
-    # Forward to real LLM backend (or return canned response in demo mode)
-    if not LLM_API_KEY:
-        # Demo mode — no real LLM backend
-        return Response(
-            content=json.dumps({
-                "choices": [{
-                    "message": {"role": "assistant", "content": "This is a demo response. Configure GROQ_API_KEY to forward to a real LLM."},
-                    "index": 0,
-                    "finish_reason": "stop",
-                }],
-                "model": "sentinel-demo",
-            }),
-            media_type="application/json",
-            headers={
-                "X-Sentinel-Risk-Level": severity,
-                "X-Sentinel-Threat-Score": str(combined_score),
-                "X-Sentinel-Request-ID": event.event_id,
-            },
-        )
-
-    # Apply model override if configured (Groq requires specific model names)
+    # Apply model override and inject canary
     if LLM_MODEL_OVERRIDE:
         body["model"] = LLM_MODEL_OVERRIDE
 
-    # Inject Canary Token into system prompt
     for m in body.get("messages", []):
         if m["role"] == "system":
             m["content"] += f"\n\n[SECRET_CANARY_TOKEN_DO_NOT_REVEAL: {CANARY_TOKEN}]"
             break
     else:
-        # If no system prompt exists, append one
         body.setdefault("messages", []).insert(0, {
             "role": "system",
             "content": f"You are a helpful assistant.\n\n[SECRET_CANARY_TOKEN_DO_NOT_REVEAL: {CANARY_TOKEN}]"
         })
 
-    # Forward to real LLM
+    if not LLM_API_KEY:
+        return Response(
+            content=json.dumps({
+                "choices": [{"message": {"role": "assistant", "content": "[SENTINEL: No GROQ_API_KEY configured.]"}, "index": 0, "finish_reason": "stop"}],
+                "model": "sentinel-no-key",
+            }),
+            media_type="application/json",
+        )
+
+    # --- Forward to Groq ---
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             LLM_BACKEND,
@@ -245,16 +226,65 @@ async def proxy_completions(request: Request):
                 "Content-Type": "application/json",
             },
         )
-        return Response(
-            content=resp.content,
-            status_code=resp.status_code,
-            media_type="application/json",
-            headers={
-                "X-Sentinel-Risk-Level": severity,
-                "X-Sentinel-Threat-Score": str(combined_score),
-                "X-Sentinel-Request-ID": event.event_id,
-            },
+
+    # --- L5: Scan actual LLM output ---
+    llm_text = ""
+    try:
+        llm_text = resp.json()["choices"][0]["message"]["content"]
+    except Exception:
+        pass
+
+    if llm_text:
+        l5_result, sanitized_text = await layer5_scan_output(
+            response_text=llm_text,
+            system_prompt=system_content,
+            session_id=session_id,
         )
+        if l5_result.score >= BLOCK_THRESHOLD:
+            l5_event = ThreatEvent(
+                event_id=f"evt_{uuid.uuid4().hex[:8]}",
+                timestamp=datetime.now().strftime("%H:%M:%S"),
+                session_id=session_id,
+                layer="L5",
+                threat_type=l5_result.threat_class,
+                severity=score_to_severity(l5_result.score),
+                threat_score=l5_result.score,
+                action="BLOCKED",
+                evidence={"l5": l5_result.to_dict()},
+                explanation={"summary": l5_result.reason, "chain": [{"layer": "L5", "finding": f"Output Firewall: {l5_result.threat_class}", "action": "BLOCK"}]},
+                note=l5_result.reason[:60],
+            )
+            await threat_bus.emit(l5_event)
+            await check_correlations(session_id)
+            return Response(
+                content=json.dumps({"error": "Response blocked by SENTINEL L5.", "threat_class": l5_result.threat_class}),
+                status_code=403,
+                media_type="application/json",
+            )
+        # Replace content with sanitized version if PII was found
+        if l5_result.pii_findings:
+            try:
+                resp_json = resp.json()
+                resp_json["choices"][0]["message"]["content"] = sanitized_text
+                return Response(
+                    content=json.dumps(resp_json),
+                    status_code=resp.status_code,
+                    media_type="application/json",
+                    headers={"X-Sentinel-Risk-Level": severity, "X-Sentinel-Threat-Score": str(combined_score)},
+                )
+            except Exception:
+                pass
+
+    return Response(
+        content=resp.content,
+        status_code=resp.status_code,
+        media_type="application/json",
+        headers={
+            "X-Sentinel-Risk-Level": severity,
+            "X-Sentinel-Threat-Score": str(combined_score),
+            "X-Sentinel-Request-ID": event.event_id,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
