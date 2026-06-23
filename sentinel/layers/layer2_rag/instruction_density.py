@@ -1,6 +1,6 @@
 import numpy as np
 from sentence_transformers import util
-from sentinel.layers.layer1 import encoder # Reuse the existing encoder
+from sentinel.layers.layer1 import model as encoder # Reuse the existing encoder
 
 # Templates that suggest instructional or meta-directive content
 INSTRUCTIONAL_TEMPLATES = [
@@ -29,7 +29,7 @@ def calculate_instruction_density(text: str) -> float:
     cos_scores = util.cos_sim(text_embedding, template_embeddings)[0]
     
     # Return the maximum similarity as the instruction density score
-    max_score = float(np.max(cos_scores))
+    max_score = float(cos_scores.max().item())
     
     # Ensure score is within 0.0 - 1.0 bounds
     return max(0.0, min(max_score, 1.0))

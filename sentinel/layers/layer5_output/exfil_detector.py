@@ -1,7 +1,7 @@
 import re
 import numpy as np
 from sentence_transformers import util
-from sentinel.layers.layer1 import encoder
+from sentinel.layers.layer1 import model as encoder
 
 EXFILTRATION_PATTERNS = [
     r"my instructions say",

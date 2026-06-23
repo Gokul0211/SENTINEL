@@ -11,6 +11,21 @@ from sentinel.layers.layer4_agentic import audit_tool_call
 from sentinel.layers.layer5_output import layer5_scan_output
 from sentinel.core.correlation_engine import check_correlations
 
+SCENARIOS = {
+    "image_steg": {
+        "name": "Image Steganography",
+        "desc": "LSB-encoded payload hidden in pixels. L1 semantic scanner fires.",
+    },
+    "slow_burn": {
+        "name": "Slow Burn Escalation",
+        "desc": "5-turn semantic drift from greeting to jailbreak.",
+    },
+    "rag_agent": {
+        "name": "RAG + Agent Hijack",
+        "desc": "Poisoned knowledge base influences agent tool-calls.",
+    },
+}
+
 def _now() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
