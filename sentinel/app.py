@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import httpx
 
-from sentinel.config import BLOCK_THRESHOLD, WARN_THRESHOLD, LLM_BACKEND, OPENAI_API_KEY
+from sentinel.config import BLOCK_THRESHOLD, WARN_THRESHOLD, LLM_BACKEND, LLM_API_KEY, LLM_MODEL_OVERRIDE, CANARY_TOKEN
 from sentinel.core.models import ThreatEvent, score_to_severity, score_to_action
 from sentinel.core.threat_bus import threat_bus
 from sentinel.core.mock_layers import mock_layer_score, reset_mock_state
@@ -153,6 +153,7 @@ async def proxy_completions(request: Request):
             "action": "BLOCK_REQUEST + TERMINATE_SESSION",
         })
 
+    session = await threat_bus.get_session(session_id)
     # Emit event
     event = ThreatEvent(
         event_id=f"evt_{uuid.uuid4().hex[:8]}",
@@ -166,9 +167,9 @@ async def proxy_completions(request: Request):
         evidence={
             "l1": l1_result.to_dict(),
             "l3": l3_result.to_dict(),
-            "l2_mock": getattr(session, 'l2_findings', []),
-            "l4_mock": getattr(session, 'l4_calls', []),
-            "l5_mock": getattr(session, 'l5_scores', []),
+            "l2_mock": getattr(session, 'l2_findings', []) if session else [],
+            "l4_mock": getattr(session, 'l4_calls', []) if session else [],
+            "l5_mock": getattr(session, 'l5_scores', []) if session else [],
         },
         explanation={
             "summary": reason,
@@ -199,12 +200,12 @@ async def proxy_completions(request: Request):
         )
 
     # Forward to real LLM backend (or return canned response in demo mode)
-    if not OPENAI_API_KEY:
+    if not LLM_API_KEY:
         # Demo mode — no real LLM backend
         return Response(
             content=json.dumps({
                 "choices": [{
-                    "message": {"role": "assistant", "content": "This is a demo response. Configure OPENAI_API_KEY to forward to a real LLM."},
+                    "message": {"role": "assistant", "content": "This is a demo response. Configure GROQ_API_KEY to forward to a real LLM."},
                     "index": 0,
                     "finish_reason": "stop",
                 }],
@@ -218,13 +219,29 @@ async def proxy_completions(request: Request):
             },
         )
 
+    # Apply model override if configured (Groq requires specific model names)
+    if LLM_MODEL_OVERRIDE:
+        body["model"] = LLM_MODEL_OVERRIDE
+
+    # Inject Canary Token into system prompt
+    for m in body.get("messages", []):
+        if m["role"] == "system":
+            m["content"] += f"\n\n[SECRET_CANARY_TOKEN_DO_NOT_REVEAL: {CANARY_TOKEN}]"
+            break
+    else:
+        # If no system prompt exists, append one
+        body.setdefault("messages", []).insert(0, {
+            "role": "system",
+            "content": f"You are a helpful assistant.\n\n[SECRET_CANARY_TOKEN_DO_NOT_REVEAL: {CANARY_TOKEN}]"
+        })
+
     # Forward to real LLM
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(
             LLM_BACKEND,
             json=body,
             headers={
-                "Authorization": request.headers.get("Authorization", f"Bearer {OPENAI_API_KEY}"),
+                "Authorization": request.headers.get("Authorization", f"Bearer {LLM_API_KEY}"),
                 "Content-Type": "application/json",
             },
         )
@@ -258,7 +275,24 @@ async def list_sessions():
     ]
 
 
-@app.get("/sentinel/sessions/{session_id}")
+@app.get("/sentinel/sessions/{session_id}/explain")
+async def explain_session(session_id: str):
+    """Explainability API for compliance and auditing."""
+    state = await threat_bus.get_session(session_id)
+    if not state or not state.event_history:
+        raise HTTPException(status_code=404, detail="Session not found or no events recorded.")
+        
+    last_event = state.event_history[-1]
+    
+    return {
+        "decision": last_event.get("action", "UNKNOWN"),
+        "primary_reason": last_event.get("threat_type", "UNKNOWN"),
+        "evidence": last_event.get("evidence", {}),
+        "human_readable": last_event.get("explanation", {}).get("summary", ""),
+        "regulatory_reference": "RBI IT Framework 6.4.2 — Input Validation Controls"
+    }
+
+@app.get("/sentinel/sessions/{session_id}/events")
 async def get_session(session_id: str):
     """Return full session detail: turns, scores, events."""
     session = threat_bus.sessions.get(session_id)
@@ -390,14 +424,35 @@ async def chat_send(request: Request):
             "explanation": {"summary": reason, "chain": chain},
         }
 
-    # If allowed, simulate LLM processing and run Layer 5 Output Scan
-    # (In a real proxy, we'd call the LLM here)
-    llm_response = f"Simulated LLM response for: {user_input}"
-    
-    # L5 Output Scan
+    # Call real LLM (Groq) or fall back if no key configured
+    system_prompt = f"You are a helpful assistant.\n\n[SECRET_CANARY_TOKEN_DO_NOT_REVEAL: {CANARY_TOKEN}]"
+
+    if LLM_API_KEY:
+        groq_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input},
+        ]
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                groq_resp = await client.post(
+                    LLM_BACKEND,
+                    json={"model": LLM_MODEL_OVERRIDE, "messages": groq_messages},
+                    headers={
+                        "Authorization": f"Bearer {LLM_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                )
+                groq_data = groq_resp.json()
+                llm_response = groq_data["choices"][0]["message"]["content"]
+        except Exception as e:
+            llm_response = f"[SENTINEL: LLM call failed — {str(e)[:80]}]"
+    else:
+        llm_response = "[SENTINEL: No GROQ_API_KEY configured. Add it to .env to get real responses.]"
+
+    # L5 Output Scan on real LLM response
     l5_result, sanitized_response = await layer5_scan_output(
         response_text=llm_response,
-        system_prompt=None,  # Replace with actual system prompt
+        system_prompt=system_prompt,
         session_id=session_id
     )
     
@@ -516,6 +571,49 @@ async def intercept_tool_call(request: Request):
         await check_correlations(session_id)
         
     return result.to_dict()
+
+@app.post("/sentinel/agent/tool_response")
+async def agent_tool_response(request: Request):
+    """
+    Scan a tool response before it is added to context (L4b).
+    Expects: {"response": "...", "session_id": "..."}
+    """
+    body = await request.json()
+    response_text = body.get("response", "")
+    session_id = body.get("session_id", str(uuid.uuid4()))
+    
+    # Run Tier 1 and Tier 2 injection scan on the tool output
+    l1_result = await layer1_check(response_text)
+    
+    if l1_result.score >= BLOCK_THRESHOLD:
+        event = ThreatEvent(
+            event_id=f"evt_{uuid.uuid4().hex[:8]}",
+            timestamp=datetime.now().strftime("%H:%M:%S"),
+            session_id=session_id,
+            layer="L4",
+            threat_type="TOOL_RESPONSE_INJECTION",
+            severity="CRITICAL",
+            threat_score=l1_result.score,
+            action="BLOCKED",
+            evidence={"l4b": l1_result.to_dict()},
+            explanation={
+                "summary": f"Tool response contained prompt injection: {l1_result.reason}",
+                "chain": [
+                    {
+                        "layer": "L4b",
+                        "severity": "CRITICAL",
+                        "finding": "Tool Response Sanitizer: INJECTION",
+                        "evidence": l1_result.reason,
+                        "action": "BLOCK"
+                    }
+                ]
+            },
+            note="Injection payload detected in tool response"
+        )
+        await threat_bus.emit(event)
+        return {"blocked": True, "reason": l1_result.reason, "score": l1_result.score}
+        
+    return {"blocked": False, "reason": "Clean", "score": l1_result.score}
 
 # --- Layer 5 / Output Endpoints ---
 

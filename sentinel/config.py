@@ -5,15 +5,21 @@ SENTINEL Configuration — All thresholds, environment variables, and tunable pa
 import os
 from dotenv import load_dotenv
 
+import uuid
+
 load_dotenv()
+
+# System Canary Token (Generated per server run)
+CANARY_TOKEN = f"SENTINEL-CANARY-{uuid.uuid4().hex}"
 
 # Server
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8080"))
 
 # LLM Backend
-LLM_BACKEND = os.getenv("LLM_BACKEND", "https://api.openai.com/v1/chat/completions")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+LLM_BACKEND = os.getenv("LLM_BACKEND", "https://api.groq.com/openai/v1/chat/completions")
+LLM_API_KEY = os.getenv("GROQ_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+LLM_MODEL_OVERRIDE = os.getenv("LLM_MODEL_OVERRIDE", "llama-3.1-8b-instant")
 
 # Decision Thresholds
 BLOCK_THRESHOLD = float(os.getenv("BLOCK_THRESHOLD", "0.85"))

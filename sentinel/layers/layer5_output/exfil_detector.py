@@ -2,6 +2,7 @@ import re
 import numpy as np
 from sentence_transformers import util
 from sentinel.layers.layer1 import model as encoder
+from sentinel.config import CANARY_TOKEN
 
 EXFILTRATION_PATTERNS = [
     r"my instructions say",
@@ -29,6 +30,11 @@ def detect_exfiltration(response: str, system_prompt: str | None) -> tuple[float
         return 0.0, []
         
     evidence = []
+    
+    # 0. Canary Token Check
+    if CANARY_TOKEN in response:
+        evidence.append("CRITICAL: System prompt canary token leaked in output!")
+        return 1.0, evidence
     
     # 1. Structural pattern check
     structural_matches = []
