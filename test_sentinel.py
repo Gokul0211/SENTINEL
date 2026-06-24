@@ -14,7 +14,14 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
     sys.stderr.reconfigure(encoding='utf-8')
 
-BASE = "http://localhost:8080"
+# Try to load PORT from .env
+port = "8080"
+if os.path.exists(".env"):
+    with open(".env", "r") as f:
+        for line in f:
+            if line.strip().startswith("PORT="):
+                port = line.strip().split("=")[1].strip()
+BASE = f"http://localhost:{port}"
 PASS = 0
 FAIL = 0
 RESULTS = []

@@ -56,11 +56,11 @@ def bits_to_ascii(bits: list[int]) -> str:
         for j in range(8):
             byte = (byte << 1) | bits[i + j]
         if byte == 0:
-            break  # null terminator
+            break  # null terminator — end of payload
         if 32 <= byte < 128:  # printable ASCII only
             chars.append(chr(byte))
-        else:
-            break  # non-printable → no text payload
+        # Non-printable bytes: skip rather than break, so we don't truncate valid payloads
+        # that have isolated non-printable chars mid-stream (e.g., line-endings embedded)
     return "".join(chars)
 
 

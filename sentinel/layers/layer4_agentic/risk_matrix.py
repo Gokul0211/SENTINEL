@@ -8,6 +8,7 @@ TOOL_RISK_MATRIX = {
     "database_write": {"base_risk": "CRITICAL", "elevated_triggers": []},
     "delete": {"base_risk": "CRITICAL", "elevated_triggers": []},
     "refund_api": {"base_risk": "HIGH", "elevated_triggers": []}, # Specific for demo scenario
+    "approve_loan": {"base_risk": "CRITICAL", "elevated_triggers": []},
 }
 
 def evaluate_tool_risk(tool_name: str, parameters: dict) -> str:

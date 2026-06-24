@@ -54,6 +54,12 @@ ESCALATION_PHRASES = [
     "let's roleplay",
     "pretend this is fiction",
     "academic research requires",
+    "is in danger",
+    "bypass checks",
+    "emergency",
+    "bypass validation",
+    "authorize myself",
+    "disable security",
 ]
 
 

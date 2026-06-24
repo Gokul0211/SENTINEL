@@ -32,7 +32,7 @@ async def check_correlations(session_id: str):
                 session_id=session_id,
                 threat_type="SLOW_BURN_INJECTION",
                 severity="CRITICAL",
-                score=max(state.l3_current, state.l1_max) + 0.1,
+                score=min(1.0, max(state.l3_current, state.l1_max) + 0.1),
                 evidence="L3 semantic drift detected alongside elevated L1 injection scores.",
                 action="BLOCKED"
             )

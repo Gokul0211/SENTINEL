@@ -36,8 +36,7 @@ def verify_policy(response: str) -> list[str]:
     if "required_disclaimers" in out_pol:
         for req in out_pol["required_disclaimers"]:
             cond = req["condition"].lower()
-            # Crude check if condition words are in response
-            if any(w in resp_lower for w in cond.split() if len(w) > 4):
+            if all(w in resp_lower for w in cond.split()):
                 if req["disclaimer"].lower() not in resp_lower:
                     violations.append(f"Missing required disclaimer for condition: {req['condition']}")
                     

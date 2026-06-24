@@ -135,3 +135,7 @@ def retrieve_and_validate(query: str, top_k: int = 3) -> list:
         
     return validated_chunks
 
+def reset_store():
+    """Clear all in-memory RAG chunk stores. Called on /sentinel/reset."""
+    collection.clear()
+    quarantine_store.clear()

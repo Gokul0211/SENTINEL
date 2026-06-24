@@ -1,5 +1,5 @@
 from sentinel.core.models import L2Result
-from .chunk_store import ingest_chunk, get_all_chunks, quarantine_chunk, retrieve_and_validate
+from .chunk_store import ingest_chunk, get_all_chunks, quarantine_chunk, retrieve_and_validate, reset_store
 
 async def layer2_ingest(text: str, source: str) -> dict:
     """
@@ -52,3 +52,7 @@ def layer2_get_chunks() -> list:
 def layer2_quarantine(chunk_id: str) -> bool:
     """Manually quarantine a chunk."""
     return quarantine_chunk(chunk_id)
+
+def layer2_reset() -> None:
+    """Clear all RAG chunk stores. Called on /sentinel/reset."""
+    reset_store()

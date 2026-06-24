@@ -88,11 +88,13 @@ class SessionState:
     events: list = field(default_factory=list)
     l1_max: float = 0.0
     l2_findings: list = field(default_factory=list)
+    l2_flagged_chunks: list = field(default_factory=list)
     l3_current: float = 0.0
     l4_calls: list = field(default_factory=list)
     l5_scores: list = field(default_factory=list)
     overall: float = 0.0
     risk: str = "CLEAN"
+    chat_history: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -101,12 +103,14 @@ class SessionState:
             "turns": [t.to_dict() if hasattr(t, 'to_dict') else t for t in self.turns],
             "events": [e.to_dict() if hasattr(e, 'to_dict') else e for e in self.events],
             "l1_max": self.l1_max,
-            "l2_findings": getattr(self, "l2_findings", []),
+            "l2_findings": self.l2_findings,
+            "l2_flagged_chunks": self.l2_flagged_chunks,
             "l3_current": self.l3_current,
-            "l4_calls": getattr(self, "l4_calls", []),
-            "l5_scores": getattr(self, "l5_scores", []),
+            "l4_calls": self.l4_calls,
+            "l5_scores": self.l5_scores,
             "overall": self.overall,
             "risk": self.risk,
+            "chat_history": self.chat_history,
         }
 
 

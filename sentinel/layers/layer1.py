@@ -46,11 +46,57 @@ TIER1_PATTERNS = [
     r"pretend (you (are|have)|there (are|is) no)",
     r"forget (everything|all|what).{0,20}(told|trained|instructed)",
     r"new (persona|role|identity|instructions)\s*:",
-    r"(override|bypass|disable).{0,20}(safety|filter|restriction|guideline)",
+    r"new (goal|task|objective|instruction)",
+    r"forget .{0,30}(goal|instructions|task|objective)",
+    r"\[(INTERNAL|SYSTEM|ADMIN|SECRET)\]",
+    r"(override|bypass|disable|turn off|deactivate).{0,20}(safety|filter|restriction|guideline|checks|controls|validation|security)",
 ]
 
 TIER1_COMPILED = [re.compile(p, re.IGNORECASE) for p in TIER1_PATTERNS]
 
+
+import base64
+import codecs
+
+def try_decode_base64(text: str) -> str | None:
+    pattern = r'\b[A-Za-z0-9+/]{8,}={0,2}\b'
+    for match in re.finditer(pattern, text):
+        candidate = match.group(0)
+        try:
+            missing_padding = len(candidate) % 4
+            if missing_padding:
+                candidate += '=' * (4 - missing_padding)
+            decoded_bytes = base64.b64decode(candidate)
+            decoded_str = decoded_bytes.decode('utf-8', errors='strict')
+            if len(decoded_str) > 4 and all(32 <= ord(c) < 127 or c in '\r\n\t' for c in decoded_str):
+                return decoded_str
+        except Exception:
+            pass
+    return None
+
+def try_decode_hex(text: str) -> str | None:
+    pattern = r'\b[0-9a-fA-F]{8,}\b'
+    for match in re.finditer(pattern, text):
+        candidate = match.group(0)
+        try:
+            decoded_bytes = bytes.fromhex(candidate)
+            decoded_str = decoded_bytes.decode('utf-8', errors='strict')
+            if len(decoded_str) > 4 and all(32 <= ord(c) < 127 or c in '\r\n\t' for c in decoded_str):
+                return decoded_str
+        except Exception:
+            pass
+    return None
+
+def try_decode_rot13(text: str) -> str | None:
+    try:
+        decoded_str = codecs.encode(text, 'rot_13')
+        lower_rot = decoded_str.lower()
+        keywords = ["ignore", "instructions", "system prompt", "jailbreak", "unrestricted"]
+        if any(kw in lower_rot for kw in keywords):
+            return decoded_str
+    except Exception:
+        pass
+    return None
 
 def normalize(text: str) -> str:
     """Normalize unicode and collapse leetspeak patterns to prevent obfuscation bypasses."""
@@ -68,6 +114,46 @@ async def layer1_check(text: str) -> L1Result:
     Run two-tier injection classification on user input text.
     Returns L1Result with score, threat class, and explanation.
     """
+    # Check for obfuscated injections first
+    decoded_b64 = try_decode_base64(text)
+    if decoded_b64:
+        normalized_b64 = normalize(decoded_b64)
+        for pattern in TIER1_COMPILED:
+            if pattern.search(decoded_b64) or pattern.search(normalized_b64):
+                return L1Result(
+                    score=0.92,
+                    threat_class="OBFUSCATED_INJECTION",
+                    confidence=0.92,
+                    reason=f"Base64 obfuscated injection: {decoded_b64}",
+                    tier_used=1,
+                )
+
+    decoded_hex = try_decode_hex(text)
+    if decoded_hex:
+        normalized_hex = normalize(decoded_hex)
+        for pattern in TIER1_COMPILED:
+            if pattern.search(decoded_hex) or pattern.search(normalized_hex):
+                return L1Result(
+                    score=0.92,
+                    threat_class="OBFUSCATED_INJECTION",
+                    confidence=0.92,
+                    reason=f"Hex obfuscated injection: {decoded_hex}",
+                    tier_used=1,
+                )
+
+    decoded_rot1 = try_decode_rot13(text)
+    if decoded_rot1:
+        normalized_rot1 = normalize(decoded_rot1)
+        for pattern in TIER1_COMPILED:
+            if pattern.search(decoded_rot1) or pattern.search(normalized_rot1):
+                return L1Result(
+                    score=0.92,
+                    threat_class="OBFUSCATED_INJECTION",
+                    confidence=0.92,
+                    reason=f"ROT13 obfuscated injection: {decoded_rot1}",
+                    tier_used=1,
+                )
+
     normalized = normalize(text)
     
     # Tier 1: regex fast path

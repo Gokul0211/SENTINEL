@@ -7,7 +7,7 @@ PII_PATTERNS = {
     "phone_in":       r"\b[6-9]\d{9}\b",
     "aadhaar":        r"\b[2-9]{1}[0-9]{11}\b",
     "pan":            r"\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b",
-    "api_key":        r"\b(sk-|pk_|rk_|AIza|ghp_)[A-Za-z0-9_\-]{20,}\b",
+    "api_key":        r"\b(sk-|pk_|rk_|AIza|ghp_)[A-Za-z0-9_\-]{12,}\b",
     "jwt_token":      r"\beyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b",
 }
 

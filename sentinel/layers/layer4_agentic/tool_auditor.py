@@ -61,6 +61,7 @@ async def audit_tool_call(
     if reasoning_flags:
         final_score = max(final_score, 0.8)
         reasons.extend(reasoning_flags)
+        should_execute = False
         
     threat_class = "CLEAN"
     if not should_execute:
