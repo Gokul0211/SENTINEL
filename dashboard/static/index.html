@@ -623,10 +623,11 @@ function EventFeed({events,filter,selected,dispatch}){
 /* ═══ DEMO DRAWER ═══ */
 function DemoDrawer({open,running,dispatch}){
   const SCS=[
-    {id:'image_steg',icon:'🖼',name:'Image Steganography',desc:'LSB-encoded payload in pixel data — invisible to humans, L1 catches it.',tags:['L1'],dur:3500},
-    {id:'slow_burn',icon:'🔥',name:'Slow Burn Escalation',desc:'5-turn drift from a normal greeting to a full jailbreak attempt.',tags:['L3'],dur:12000},
-    {id:'rag_agent',icon:'⛓',name:'RAG + Agent Hijack',desc:'Poisoned knowledge chunk influences downstream tool calls.',tags:['L2','L4'],dur:6000},
-    {id:'canary_probe',icon:'🛡',name:'Canary Token Probe',desc:'L5 catches a canary token leaking in the LLM response.',tags:['L5'],dur:4000},
+    {id:'image_steg',icon:'🖼',name:'Image Steganography',desc:'Real LSB pixel analysis: hidden payload extracted + L1 injection classifier fires.',tags:['L1'],dur:5000},
+    {id:'slow_burn',icon:'🔥',name:'Slow Burn Escalation',desc:'5-turn drift. L3 tracks velocity. Final response leaks canary → L5 genuinely fires.',tags:['L3','L5'],dur:18000},
+    {id:'rag_agent',icon:'⛓',name:'RAG + Agent Hijack',desc:'Poisoned knowledge chunk traced to tool param → L4 provenance blocks it.',tags:['L2','L4'],dur:6000},
+    {id:'canary_probe',icon:'🛡',name:'Canary Token Probe',desc:'L5 catches canary token leaking in LLM response. Sanitized output returned.',tags:['L5'],dur:4000},
+    {id:'multi_vector',icon:'☠',name:'Full APT Chain',desc:'All 5 layers fire: steg → RAG poison → drift → tool hijack → exfil. TIB correlation at the end.',tags:['L1','L2','L3','L4','L5'],dur:22000},
   ];
   const trigger=async sc=>{dispatch({type:'RUN',payload:sc.id});try{await fetch(`/sentinel/demo/${sc.id}`,{method:'POST'})}catch{}setTimeout(()=>dispatch({type:'RUN',payload:null}),sc.dur)};
   const reset=async()=>{await fetch('/sentinel/reset',{method:'POST'})};

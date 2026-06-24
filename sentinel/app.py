@@ -23,7 +23,7 @@ import httpx
 from sentinel.config import BLOCK_THRESHOLD, WARN_THRESHOLD, LLM_BACKEND, LLM_API_KEY, LLM_MODEL_OVERRIDE, CANARY_TOKEN
 from sentinel.core.models import ThreatEvent, score_to_severity, score_to_action
 from sentinel.core.threat_bus import threat_bus
-from sentinel.core.mock_layers import mock_layer_score, reset_mock_state
+# mock_layers.py is kept for reference but mock_layer_score is NOT called in any pipeline
 from sentinel.layers.layer1 import layer1_check, L1Result
 from sentinel.layers.layer2_rag import layer2_ingest, layer2_validate_context, layer2_get_chunks, layer2_quarantine
 from sentinel.layers.layer3 import layer3_check, L3Result, reset_layer3_state
@@ -441,7 +441,7 @@ async def trigger_demo(scenario_id: str, request: Request, background_tasks: Bac
 async def reset():
     """Clear all state — reset dashboard to zero."""
     threat_bus.reset()
-    reset_mock_state()
+    # (no mock state to reset — all layers are real)
     reset_correlation_state()
     reset_layer3_state()
 
