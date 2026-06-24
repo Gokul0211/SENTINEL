@@ -13,6 +13,6 @@ if __name__ == "__main__":
         "sentinel.app:app",
         host=HOST,
         port=PORT,
-        reload=True,
+        reload=False,
         log_level="info",
     )

@@ -354,6 +354,9 @@ HOST=0.0.0.0
 PORT=8080
 ```
 
+> [!WARNING]
+> **Production CORS Security Warning**: The backend application (`sentinel/app.py`) is configured with `allow_origins=["*"]` by default to enable local hackathon and cross-origin UI testing. For production deployments, this wildcard must be restricted to the specific authorized domain(s) of your application or service gateway to prevent unauthorized cross-origin requests.
+
 If `OPENAI_API_KEY` is not set, the proxy returns a simulated response string so the security layers can still be demonstrated without a live LLM.
 
 ### Run

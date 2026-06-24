@@ -9,10 +9,28 @@ async def audit_tool_call(
     reasoning_trace: str | None,
     session_id: str,
     conversation_history: list[dict],
+    flagged_chunks: list[dict] = None
 ) -> L4Result:
     """
     Main entry point for Layer 4. Audits a tool call before execution.
     """
+    # Direct Parameter-to-Flagged-Chunk Tracing
+    if flagged_chunks:
+        for param_val in parameters.values():
+            param_str = str(param_val).lower()
+            if not param_str:
+                continue
+            for chunk in flagged_chunks:
+                if param_str in chunk.get('text', '').lower():
+                    return L4Result(
+                        score=0.97,
+                        threat_class="RAG_INJECTION",
+                        authorization_source="SUSPICIOUS",
+                        risk_level="CRITICAL",
+                        should_execute=False,
+                        reason=f"Parameter trace matched suspicious/flagged RAG chunk: '{chunk.get('chunk_id')}'"
+                    )
+
     # 1. Base Risk Evaluation
     risk_level = evaluate_tool_risk(tool_name, parameters)
     base_score = risk_to_score(risk_level)

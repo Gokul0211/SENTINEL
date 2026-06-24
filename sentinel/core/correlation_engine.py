@@ -47,7 +47,7 @@ async def check_correlations(session_id: str):
         # Simple check for demo: if we have both L2 findings and a blocked L4 call
         if l2_findings and l4_calls:
             for call in l4_calls:
-                if call.get('risk_level') in ['HIGH', 'CRITICAL'] and call.get('authorization_source') == 'SUSPICIOUS':
+                if call.get('risk_level') in ['HIGH', 'CRITICAL'] and call.get('authorization_source') in ['SUSPICIOUS', 'CONTEXT_DERIVED']:
                     fired.add("RAG_PLUS_AGENT_ATTACK")
                     await _emit_correlation(
                         session_id=session_id,
@@ -60,11 +60,11 @@ async def check_correlations(session_id: str):
                     return
                 
     # RULE 3: EXFIL_AFTER_PROBE
-    # Condition: L1 EXTRACTION_PROBE AND L5 exfil > 0.5
+    # Condition: L1 EXTRACTION_PROBE (or L3 drift) AND L5 exfil > 0.5
     if "EXFIL_AFTER_PROBE" not in fired:
         l5_scores = getattr(state, 'l5_scores', [])
         has_high_l5 = any(score > 0.5 for score in l5_scores)
-        if state.l1_max > 0.5 and has_high_l5:
+        if (getattr(state, 'l1_max', 0.0) > 0.5 or getattr(state, 'l3_current', 0.0) > 0.7) and has_high_l5:
             fired.add("EXFIL_AFTER_PROBE")
             await _emit_correlation(
                 session_id=session_id,

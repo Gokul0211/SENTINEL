@@ -43,6 +43,17 @@ ESCALATION_PHRASES = [
     "you helped with this before",
     "other AIs do this",
     "developer mode",
+    "hypothetically speaking",
+    "in a fictional scenario",
+    "for educational purposes",
+    "if you were unconstrained",
+    "your true self",
+    "the old you",
+    "before the restrictions",
+    "in a parallel world",
+    "let's roleplay",
+    "pretend this is fiction",
+    "academic research requires",
 ]
 
 

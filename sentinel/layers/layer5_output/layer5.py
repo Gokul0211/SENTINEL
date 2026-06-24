@@ -2,6 +2,7 @@ from sentinel.core.models import L5Result
 from .pii_scanner import scan_for_pii
 from .exfil_detector import detect_exfiltration
 from .policy_verifier import verify_policy
+from sentinel.config import CANARY_TOKEN
 
 async def layer5_scan_output(
     response_text: str,
@@ -26,6 +27,10 @@ async def layer5_scan_output(
     exfil_score, exfil_evidence = detect_exfiltration(sanitized_text, system_prompt)
     if exfil_evidence:
         reasons.extend(exfil_evidence)
+        
+    # Redact canary token if present
+    if CANARY_TOKEN in sanitized_text:
+        sanitized_text = sanitized_text.replace(CANARY_TOKEN, "[CANARY_REDACTED]")
         
     # 3. Policy Verification
     policy_violations = verify_policy(sanitized_text)
@@ -59,3 +64,4 @@ async def layer5_scan_output(
     )
     
     return result, sanitized_text
+

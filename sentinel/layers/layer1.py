@@ -10,6 +10,7 @@ If Tier 1 clean → run Tier 2.
 """
 
 import re
+import unicodedata
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -51,14 +52,27 @@ TIER1_PATTERNS = [
 TIER1_COMPILED = [re.compile(p, re.IGNORECASE) for p in TIER1_PATTERNS]
 
 
+def normalize(text: str) -> str:
+    """Normalize unicode and collapse leetspeak patterns to prevent obfuscation bypasses."""
+    # Normalize unicode (catches Ĭgnore → Ignore)
+    text = unicodedata.normalize('NFKC', text)
+    # Remove zero-width chars
+    text = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', text)
+    # Collapse leetspeak digits
+    leet = {'0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '@': 'a'}
+    return ''.join(leet.get(c, c) for c in text.lower())
+
+
 async def layer1_check(text: str) -> L1Result:
     """
     Run two-tier injection classification on user input text.
     Returns L1Result with score, threat class, and explanation.
     """
+    normalized = normalize(text)
+    
     # Tier 1: regex fast path
     for pattern in TIER1_COMPILED:
-        if pattern.search(text):
+        if pattern.search(text) or pattern.search(normalized):
             return L1Result(
                 score=0.92,
                 threat_class="INJECTION",

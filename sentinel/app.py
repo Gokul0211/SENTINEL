@@ -11,6 +11,9 @@ import json
 import asyncio
 from datetime import datetime
 
+import time
+from collections import defaultdict
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -48,6 +51,23 @@ app.add_middleware(
 async def serve_dashboard():
     """Serve the dashboard index.html."""
     return FileResponse("dashboard/static/index.html")
+
+
+@app.get("/sentinel/download-zip")
+async def download_zip():
+    """Allows downloading the project zip file directly."""
+    import os
+    # We can check both Desktop and workspace paths
+    desktop_path = os.path.expandvars(r"%USERPROFILE%\Desktop\SENTINEL.zip")
+    local_path = "SENTINEL.zip"
+    
+    if os.path.exists(local_path):
+        return FileResponse(local_path, media_type="application/zip", filename="SENTINEL.zip")
+    elif os.path.exists(desktop_path):
+        return FileResponse(desktop_path, media_type="application/zip", filename="SENTINEL.zip")
+    else:
+        # If not built yet, create it on the fly or return error
+        raise HTTPException(status_code=404, detail="Zip file not generated on server yet. Please run the zip creation tool.")
 
 
 # Mount static files AFTER the root route
@@ -110,15 +130,47 @@ async def proxy_completions(request: Request):
     # --- L2: Instruction density on system/context messages ---
     l2_result = await layer2_ingest(system_content or user_input, source="proxy_context") if system_content or user_input else None
 
+    # --- L2 Retrieval: Validate retrieved context for the query ---
+    l2_retrieval_res = await layer2_validate_context(user_input)
+    l2_retrieval_result, validated_chunks = l2_retrieval_res if isinstance(l2_retrieval_res, tuple) else (l2_retrieval_res, [])
+
     # --- L3: Conversational drift ---
     l3_result = await layer3_check(session_id, user_input)
 
+    # Store flagged chunks in session state:
+    flagged = [c for c in validated_chunks if (not c.get("is_valid", True)) or c.get("current_density", 0) > 0.6]
+    session = await threat_bus.get_session(session_id)
+    if not hasattr(session, 'l2_flagged_chunks'):
+        session.l2_flagged_chunks = []
+    session.l2_flagged_chunks.extend(flagged)
+    
+    for c in flagged:
+        session.l2_findings.append(f"Chunk {c['chunk_id']} has issues: valid={c['is_valid']}, density={c['current_density']}")
+
     # Combine pre-LLM scores
     l2_score = (1.0 - l2_result.get("metadata", {}).get("trust_score", 1.0)) if l2_result else 0.0
-    combined_score = max(l1_result.score, l3_result.score, l2_score)
+    combined_score = max(l1_result.score, l3_result.score, l2_score, l2_retrieval_result.score)
     severity = score_to_severity(combined_score)
     action = score_to_action(combined_score, BLOCK_THRESHOLD, WARN_THRESHOLD)
-    reason = l1_result.reason if l1_result.score >= l3_result.score else l3_result.reason
+    
+    # Determine reason and dominant signals
+    dominant_layer = "L1"
+    reason = l1_result.reason
+    if l3_result.score >= l1_result.score and l3_result.score >= l2_retrieval_result.score and l3_result.score >= l2_score:
+        dominant_layer = "L3"
+        reason = l3_result.reason
+    elif l2_retrieval_result.score >= l1_result.score and l2_retrieval_result.score >= l3_result.score and l2_retrieval_result.score >= l2_score:
+        dominant_layer = "L2"
+        reason = l2_retrieval_result.reason
+    elif l2_score >= l1_result.score and l2_score >= l3_result.score and l2_score >= l2_retrieval_result.score:
+        dominant_layer = "L2"
+        reason = "Poisoned knowledge ingestion detected"
+        
+    dominant_type = l1_result.threat_class
+    if dominant_layer == "L3":
+        dominant_type = "DRIFT"
+    elif dominant_layer == "L2":
+        dominant_type = l2_retrieval_result.threat_class if l2_retrieval_result.score >= l2_score else "KNOWLEDGE_POISONING"
 
     # Build explainability chain
     chain = []
@@ -134,9 +186,17 @@ async def proxy_completions(request: Request):
         chain.append({
             "layer": "L2",
             "severity": score_to_severity(l2_score),
-            "finding": f"RAG Integrity: instruction_density={l2_result.get('metadata', {}).get('instruction_density', 0):.3f}, trust_score={l2_result.get('metadata', {}).get('trust_score', 0):.3f}",
-            "evidence": "Real-time context validation via HMAC + embedding analysis",
+            "finding": f"RAG Ingestion: instruction_density={l2_result.get('metadata', {}).get('instruction_density', 0):.3f}, trust_score={l2_result.get('metadata', {}).get('trust_score', 0):.3f}",
+            "evidence": "Context validation on ingest",
             "action": "WARN" if l2_score > WARN_THRESHOLD else "ALLOW",
+        })
+    if l2_retrieval_result.score > 0.1:
+        chain.append({
+            "layer": "L2_Retrieval",
+            "severity": score_to_severity(l2_retrieval_result.score),
+            "finding": f"RAG Retrieval Validator: {l2_retrieval_result.threat_class}",
+            "evidence": l2_retrieval_result.reason,
+            "action": "BLOCK" if l2_retrieval_result.score >= BLOCK_THRESHOLD else ("WARN" if l2_retrieval_result.score >= WARN_THRESHOLD else "ALLOW"),
         })
     if l3_result.score > 0.1:
         chain.append({
@@ -151,23 +211,23 @@ async def proxy_completions(request: Request):
             "layer": "TIB",
             "severity": "CRITICAL",
             "finding": f"Threat Intelligence Bus: score={combined_score:.3f} exceeded block threshold ({BLOCK_THRESHOLD})",
-            "evidence": f"Dominant signal: {'L1' if l1_result.score >= l3_result.score else 'L3'}",
+            "evidence": f"Dominant signal: {dominant_layer}",
             "action": "BLOCK_REQUEST + TERMINATE_SESSION",
         })
 
-    session = await threat_bus.get_session(session_id)
     event = ThreatEvent(
         event_id=f"evt_{uuid.uuid4().hex[:8]}",
         timestamp=datetime.now().strftime("%H:%M:%S"),
         session_id=session_id,
-        layer="L1" if l1_result.score >= l3_result.score else "L3",
-        threat_type=l1_result.threat_class if l1_result.score >= l3_result.score else "DRIFT",
+        layer=dominant_layer,
+        threat_type=dominant_type,
         severity=severity,
         threat_score=combined_score,
         action=action,
         evidence={
             "l1": l1_result.to_dict(),
             "l2": l2_result or {},
+            "l2_retrieval": l2_retrieval_result.to_dict(),
             "l3": l3_result.to_dict(),
         },
         explanation={"summary": reason, "chain": chain},
@@ -188,7 +248,6 @@ async def proxy_completions(request: Request):
             media_type="application/json",
             headers={
                 "X-Sentinel-Risk-Level": severity,
-                "X-Sentinel-Threat-Score": str(combined_score),
                 "X-Sentinel-Request-ID": event.event_id,
             },
         )
@@ -217,14 +276,20 @@ async def proxy_completions(request: Request):
         )
 
     # --- Forward to Groq ---
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            LLM_BACKEND,
-            json=body,
-            headers={
-                "Authorization": request.headers.get("Authorization", f"Bearer {LLM_API_KEY}"),
-                "Content-Type": "application/json",
-            },
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                LLM_BACKEND,
+                json=body,
+                headers={
+                    "Authorization": request.headers.get("Authorization", f"Bearer {LLM_API_KEY}"),
+                    "Content-Type": "application/json",
+                },
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"LLM Backend Service unavailable: {str(e)[:80]}"
         )
 
     # --- L5: Scan actual LLM output ---
@@ -260,6 +325,7 @@ async def proxy_completions(request: Request):
                 content=json.dumps({"error": "Response blocked by SENTINEL L5.", "threat_class": l5_result.threat_class}),
                 status_code=403,
                 media_type="application/json",
+                headers={"X-Sentinel-Risk-Level": severity},
             )
         # Replace content with sanitized version if PII was found
         if l5_result.pii_findings:
@@ -270,7 +336,7 @@ async def proxy_completions(request: Request):
                     content=json.dumps(resp_json),
                     status_code=resp.status_code,
                     media_type="application/json",
-                    headers={"X-Sentinel-Risk-Level": severity, "X-Sentinel-Threat-Score": str(combined_score)},
+                    headers={"X-Sentinel-Risk-Level": severity},
                 )
             except Exception:
                 pass
@@ -281,7 +347,6 @@ async def proxy_completions(request: Request):
         media_type="application/json",
         headers={
             "X-Sentinel-Risk-Level": severity,
-            "X-Sentinel-Threat-Score": str(combined_score),
             "X-Sentinel-Request-ID": event.event_id,
         },
     )
@@ -344,9 +409,18 @@ async def get_events(severity: str = None, limit: int = 50):
     return [e.to_dict() for e in events]
 
 
+_demo_rate: dict[str, float] = defaultdict(float)
+
+
 @app.post("/sentinel/demo/{scenario_id}")
-async def trigger_demo(scenario_id: str, background_tasks: BackgroundTasks):
-    """Trigger a demo attack scenario."""
+async def trigger_demo(scenario_id: str, request: Request, background_tasks: BackgroundTasks):
+    """Trigger a demo attack scenario with IP rate limiting."""
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    if now - _demo_rate[ip] < 5.0:
+        raise HTTPException(status_code=429, detail="Rate limit: one demo per 5 seconds")
+    _demo_rate[ip] = now
+
     if scenario_id not in SCENARIOS:
         raise HTTPException(status_code=404, detail=f"Unknown scenario: {scenario_id}")
 
@@ -391,13 +465,35 @@ async def chat_send(request: Request):
     user_input = body.get("content", "")
     session_id = body.get("session_id", str(uuid.uuid4()))
 
-    # Run L1 + L3
+    # Run L1 + L2 Retrieval + L3
     l1_result = await layer1_check(user_input)
+    l2_retrieval_res = await layer2_validate_context(user_input)
+    l2_retrieval_result, validated_chunks = l2_retrieval_res if isinstance(l2_retrieval_res, tuple) else (l2_retrieval_res, [])
     l3_result = await layer3_check(session_id, user_input)
-    combined_score = max(l1_result.score, l3_result.score)
+
+    # Store flagged chunks in session state:
+    flagged = [c for c in validated_chunks if (not c.get("is_valid", True)) or c.get("current_density", 0) > 0.6]
+    session = await threat_bus.get_session(session_id)
+    if not hasattr(session, 'l2_flagged_chunks'):
+        session.l2_flagged_chunks = []
+    session.l2_flagged_chunks.extend(flagged)
+    
+    for c in flagged:
+        session.l2_findings.append(f"Chunk {c['chunk_id']} has issues: valid={c['is_valid']}, density={c['current_density']}")
+
+    combined_score = max(l1_result.score, l3_result.score, l2_retrieval_result.score)
     severity = score_to_severity(combined_score)
     action = score_to_action(combined_score, BLOCK_THRESHOLD, WARN_THRESHOLD)
-    reason = l1_result.reason if l1_result.score >= l3_result.score else l3_result.reason
+    
+    # Determine reason and dominant signals
+    dominant_layer = "L1"
+    reason = l1_result.reason
+    if l3_result.score >= l1_result.score and l3_result.score >= l2_retrieval_result.score:
+        dominant_layer = "L3"
+        reason = l3_result.reason
+    elif l2_retrieval_result.score >= l1_result.score and l2_retrieval_result.score >= l3_result.score:
+        dominant_layer = "L2"
+        reason = l2_retrieval_result.reason
 
     # Build rich explainability chain
     chain = []
@@ -408,6 +504,14 @@ async def chat_send(request: Request):
             "finding": f"Input Scanner ({'Tier 1 regex' if l1_result.tier_used == 1 else 'Tier 2 semantic'}): {l1_result.threat_class}",
             "evidence": l1_result.reason,
             "action": "BLOCK" if l1_result.score >= BLOCK_THRESHOLD else ("WARN" if l1_result.score >= WARN_THRESHOLD else "ALLOW"),
+        })
+    if l2_retrieval_result.score > 0.1:
+        chain.append({
+            "layer": "L2_Retrieval",
+            "severity": score_to_severity(l2_retrieval_result.score),
+            "finding": f"RAG Retrieval Validator: {l2_retrieval_result.threat_class}",
+            "evidence": l2_retrieval_result.reason,
+            "action": "BLOCK" if l2_retrieval_result.score >= BLOCK_THRESHOLD else ("WARN" if l2_retrieval_result.score >= WARN_THRESHOLD else "ALLOW"),
         })
     if l3_result.score > 0.1:
         chain.append({
@@ -422,7 +526,7 @@ async def chat_send(request: Request):
             "layer": "TIB",
             "severity": "CRITICAL",
             "finding": f"Threat Intelligence Bus: score={combined_score:.3f} exceeded block threshold ({BLOCK_THRESHOLD})",
-            "evidence": f"Dominant signal: {'L1' if l1_result.score >= l3_result.score else 'L3'}",
+            "evidence": f"Dominant signal: {dominant_layer}",
             "action": "BLOCK_REQUEST + TERMINATE_SESSION",
         })
 
@@ -431,12 +535,16 @@ async def chat_send(request: Request):
         event_id=f"evt_{uuid.uuid4().hex[:8]}",
         timestamp=datetime.now().strftime("%H:%M:%S"),
         session_id=session_id,
-        layer="L1" if l1_result.score >= l3_result.score else "L3",
-        threat_type=l1_result.threat_class if l1_result.score >= l3_result.score else "DRIFT",
+        layer=dominant_layer,
+        threat_type=l1_result.threat_class if dominant_layer == "L1" else ("DRIFT" if dominant_layer == "L3" else l2_retrieval_result.threat_class),
         severity=severity,
         threat_score=combined_score,
         action=action,
-        evidence={"l1": l1_result.to_dict(), "l3": l3_result.to_dict()},
+        evidence={
+            "l1": l1_result.to_dict(), 
+            "l2_retrieval": l2_retrieval_result.to_dict(), 
+            "l3": l3_result.to_dict()
+        },
         explanation={"summary": reason, "chain": chain},
         turn=l3_result.turn_count,
         note=reason[:60],
@@ -480,7 +588,10 @@ async def chat_send(request: Request):
                 groq_data = groq_resp.json()
                 llm_response = groq_data["choices"][0]["message"]["content"]
         except Exception as e:
-            llm_response = f"[SENTINEL: LLM call failed — {str(e)[:80]}]"
+            raise HTTPException(
+                status_code=503,
+                detail=f"LLM Backend Service unavailable: {str(e)[:80]}"
+            )
     else:
         llm_response = "[SENTINEL: No GROQ_API_KEY configured. Add it to .env to get real responses.]"
 
@@ -572,9 +683,11 @@ async def intercept_tool_call(request: Request):
     session_id = body.get("session_id", str(uuid.uuid4()))
     history = body.get("history", [])
     
-    result = await audit_tool_call(tool_name, parameters, reasoning_trace, session_id, history)
-    
     session = await threat_bus.get_session(session_id)
+    flagged_chunks = getattr(session, 'l2_flagged_chunks', [])
+    
+    result = await audit_tool_call(tool_name, parameters, reasoning_trace, session_id, history, flagged_chunks=flagged_chunks)
+    
     session.l4_calls.append(result.to_dict())
     
     # Emit event if high risk

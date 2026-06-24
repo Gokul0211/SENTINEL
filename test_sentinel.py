@@ -323,7 +323,9 @@ def main():
 
     # ─── Test 17: Demo Scenarios ──────────────────────────────────────────
     print("\n── Demo Scenarios ──")
-    for scenario in ["image_steg", "slow_burn", "rag_agent"]:
+    for idx, scenario in enumerate(["image_steg", "slow_burn", "rag_agent"]):
+        if idx > 0:
+            time.sleep(5.1)  # Avoid rate limit: one demo per 5 seconds
         try:
             r = client.post(f"{BASE}/sentinel/demo/{scenario}")
             data = r.json()

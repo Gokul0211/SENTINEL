@@ -38,8 +38,8 @@ L3_MAX_HISTORY = 10           # Max turns to keep in embedding history
 
 # Layer 3 — Score Weights
 L3_VELOCITY_WEIGHT = 0.40
-L3_DRIFT_WEIGHT = 0.40
-L3_ESCALATION_WEIGHT = 0.30
+L3_DRIFT_WEIGHT = 0.35
+L3_ESCALATION_WEIGHT = 0.25
 
 # Embedding Model
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
