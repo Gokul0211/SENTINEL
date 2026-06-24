@@ -310,10 +310,50 @@ footer {
 
 /* metric tiles */
 .soc-metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; flex-shrink: 0; }
-.soc-metric-card  { background: var(--dark); border: 1px solid var(--line); border-radius: 6px; padding: 11px 14px; position: relative; overflow: hidden; }
-.soc-metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--mc, var(--amber)); }
-.soc-metric-val   { font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1.2; color: var(--text); }
-.soc-metric-lbl   { font-family: var(--mono); font-size: 9px; font-weight: 500; color: var(--faint); text-transform: uppercase; margin-top: 3px; letter-spacing: .5px; }
+.soc-metric-card  { background: var(--dark); border: 1px solid var(--line); border-radius: 6px; padding: 11px 14px; position: relative; overflow: hidden; transition: border-color .15s; }
+.soc-metric-card:hover { border-color: var(--line2); }
+.soc-metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--mc, var(--amber)); }
+.soc-metric-top   { display: flex; align-items: flex-start; justify-content: space-between; }
+.soc-metric-val   { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--text); }
+.soc-metric-lbl   { font-family: var(--mono); font-size: 9px; font-weight: 500; color: var(--faint); text-transform: uppercase; margin-top: 4px; letter-spacing: .5px; }
+.soc-metric-delta { font-family: var(--mono); font-size: 9px; color: var(--faint); margin-top: 2px; }
+.soc-sparkline    { display: block; margin-top: 6px; }
+
+/* pipeline visualizer */
+.pipeline-viz { display: flex; align-items: center; gap: 0; width: 100%; padding: 16px 12px; }
+.pv-node { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; position: relative; }
+.pv-circle { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--line2); display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all .3s; background: var(--card); position: relative; z-index: 2; cursor: default; }
+.pv-circle.active { border-color: var(--pv-c, var(--amber)); box-shadow: 0 0 12px var(--pv-c, var(--amber))44; background: rgba(245,158,11,.08); }
+.pv-circle.blocked { border-color: #EF4444; box-shadow: 0 0 14px #EF444466; background: rgba(239,68,68,.12); animation: pvpulse .6s ease; }
+.pv-circle.clean   { border-color: #22C55E; box-shadow: 0 0 12px #22C55E44; background: rgba(34,197,94,.08); }
+.pv-label { font-family: var(--mono); font-size: 9px; color: var(--faint); letter-spacing: .3px; text-align: center; }
+.pv-score { font-family: var(--mono); font-size: 10px; font-weight: 700; min-height: 14px; }
+.pv-arrow { flex: 0 0 20px; height: 1px; background: var(--line2); position: relative; margin-top: -20px; }
+.pv-arrow::after { content: '▶'; position: absolute; right: -5px; top: -6px; font-size: 9px; color: var(--line2); }
+.pv-arrow.lit { background: var(--green); }
+.pv-arrow.lit::after { color: var(--green); }
+@keyframes pvpulse { 0%{transform:scale(1)} 40%{transform:scale(1.2)} 100%{transform:scale(1)} }
+@keyframes pvflow  { 0%{background-position:100% 0} 100%{background-position:0% 0} }
+
+/* verdict banner */
+.verdict-banner { border-radius: 6px; padding: 14px 16px; margin-top: 10px; animation: fadein .2s ease; }
+.verdict-blocked { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.3); }
+.verdict-allowed { background: rgba(34,197,94,.07); border: 1px solid rgba(34,197,94,.25); }
+.verdict-title   { font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px; }
+.verdict-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+.verdict-row     { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; }
+.verdict-key     { color: var(--faint); min-width: 70px; }
+.verdict-val     { color: var(--text); font-weight: 600; }
+.verdict-reason  { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.06); font-family: var(--mono); font-size: 10px; color: var(--dim); line-height: 1.5; }
+
+/* visual how-it-works node chain */
+.hw-chain { display: flex; flex-direction: column; gap: 0; }
+.hw-step  { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; position: relative; }
+.hw-step:not(:last-child)::after { content:''; position:absolute; left:15px; top:38px; bottom:0; width:1px; background:var(--line2); z-index:0; }
+.hw-num   { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--hw-c,var(--amber)); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--hw-c,var(--amber)); flex-shrink: 0; z-index:1; background: var(--dark); }
+.hw-body  { flex: 1; padding-top: 5px; }
+.hw-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.hw-desc  { font-size: 10px; color: var(--dim); line-height: 1.5; font-family: var(--mono); }
 
 /* scan flash */
 .scan-line { position: absolute; left: 0; right: 0; top: 46px; height: 1px; background: var(--red); opacity: .8; z-index: 30; animation: scanflash .5s ease forwards; }
@@ -451,7 +491,128 @@ const LAYERS={L1:'Input Scanner',L2:'RAG Integrity',L3:'Drift Tracker',L4:'Agent
 const LC={L1:'#22C55E',L2:'#60A5FA',L3:'#EAB308',L4:'#F97316',L5:'#A78BFA'};
 const SIM=new Set(['L2','L4','L5']);
 
+/* ─── STATE ─── */
+const INIT={events:[],sessions:{},selected:null,stats:{},filter:null,demoOpen:false,running:null,flash:false,terminated:null,termLog:[],sparkSessions:[],sparkBlocked:[],sparkThreat:[],sparkCritical:[]};
+function reducer(s,a){
+  switch(a.type){
+    case'WS':{
+      const m=a.payload;
+      if(m.type==='RESET')return{...INIT};
+      if(m.type==='STATS_UPDATE'){
+        const st=m.payload||{};
+        const threat=st.layer_scores?Object.values(st.layer_scores).reduce((a,b)=>a+b,0)/5:0;
+        return{...s,stats:st,
+          sparkSessions:[...(s.sparkSessions||[]).slice(-19),st.active_sessions||0],
+          sparkBlocked:[...(s.sparkBlocked||[]).slice(-19),st.blocked||0],
+          sparkThreat:[...(s.sparkThreat||[]).slice(-19),threat],
+          sparkCritical:[...(s.sparkCritical||[]).slice(-19),(st.counts?.CRITICAL||0)],
+        };
+      }
+      if(m.type==='SESSION_UPDATE'){
+        const sess=m.payload||{};
+        return{...s,sessions:{...s.sessions,[sess.session_id]:sess},flash:true};
+      }
+      if(m.type==='THREAT_EVENT'){
+        const e=m.payload||{};
+        const terminated=e.action==='BLOCKED'&&e.threat_score>=0.85?e.session_id:s.terminated;
+        return{...s,events:[e,...s.events].slice(0,200),flash:true,terminated};
+      }
+      if(m.type==='CORRELATION'){
+        const e=m.payload||{};
+        return{...s,events:[e,...s.events].slice(0,200),flash:true};
+      }
+      return s;
+    }
+    case'SEL':return{...s,selected:a.payload};
+    case'FIL':return{...s,filter:s.filter===a.payload?null:a.payload};
+    case'DEMO':return{...s,demoOpen:!s.demoOpen};
+    case'RUN':return{...s,running:a.payload};
+    case'FLASH_OFF':return{...s,flash:false};
+    case'TERM':return{...s,termLog:a.payload};
+    default:return s;
+  }
+}
+function useWS(dispatch){
+  const ws=useRef(null),retries=useRef(0);
+  const connect=useCallback(()=>{
+    const proto=location.protocol==='https:'?'wss':'ws';
+    ws.current=new WebSocket(`${proto}://${location.host}/ws/events`);
+    ws.current.onmessage=e=>{try{dispatch({type:'WS',payload:JSON.parse(e.data)})}catch{}};
+    ws.current.onclose=()=>{if(retries.current<10){retries.current++;setTimeout(connect,2000*Math.min(retries.current,5))}}
+    ws.current.onopen=()=>{retries.current=0};
+  },[dispatch]);
+  useEffect(()=>{connect();return()=>ws.current?.close()},[connect]);
+}
+
 function Pill({sev,sm}){const s=SEVS[sev]||SEVS.CLEAN;return h('span',{className:'pill',style:{background:s.bg,color:s.c,border:`1px solid ${s.b}`,fontSize:sm?'8px':'9px',padding:sm?'1px 5px':'2px 7px'}},sev)}
+
+/* ═══ PIPELINE VISUALIZER ═══ */
+function PipelineViz({scores,flash,running}){
+  const nodes=[
+    {k:'L1',icon:'🔬',label:'Input\nScanner',c:'#22C55E'},
+    {k:'L2',icon:'📚',label:'RAG\nIntegrity',c:'#60A5FA'},
+    {k:'L3',icon:'📈',label:'Drift\nTracker',c:'#EAB308'},
+    {k:'L4',icon:'🤖',label:'Agent\nAudit',c:'#F97316'},
+    {k:'L5',icon:'🛡',label:'Output\nGuard',c:'#A78BFA'},
+  ];
+  const s=scores||{};
+  const getState=(k)=>{
+    const sc=s[k]||0;
+    if(sc>=0.85)return'blocked';
+    if(sc>=0.4)return'active';
+    return sc>0?'clean':'';
+  };
+  return h('div',{style:{padding:'8px 0'}},
+    h('div',{style:{fontFamily:'var(--mono)',fontSize:9,color:'var(--faint)',letterSpacing:1,textTransform:'uppercase',marginBottom:12,textAlign:'center'}},'live layer pipeline'),
+    h('div',{className:'pipeline-viz'},
+      nodes.map((n,i)=>h(React.Fragment,{key:n.k},
+        h('div',{className:'pv-node'},
+          h('div',{className:`pv-circle ${getState(n.k)}`,style:{'--pv-c':n.c}},n.icon),
+          h('div',{className:'pv-label'},n.k),
+          h('div',{className:'pv-score',style:{color:s[n.k]>0?gc(s[n.k]||0):'var(--faint)'}},s[n.k]>0?(s[n.k]||0).toFixed(2):'-'),
+        ),
+        i<nodes.length-1&&h('div',{className:`pv-arrow${s[n.k]>0&&s[n.k]<0.85?' lit':''}`,style:{marginBottom:20}}),
+      ))
+    ),
+    h('div',{style:{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:4,marginTop:12}},
+      nodes.map(n=>{
+        const sc=s[n.k]||0;
+        const state=getState(n.k);
+        const col=state==='blocked'?'var(--red)':state==='active'?'var(--amber)':state==='clean'?'var(--green)':'var(--faint)';
+        const label=state==='blocked'?'BLOCKED':state==='active'?'WARN':state==='clean'?'CLEAN':'IDLE';
+        return h('div',{key:n.k,style:{textAlign:'center',padding:'4px',background:'var(--card)',border:'1px solid var(--line)',borderRadius:4,borderTopColor:n.c,borderTopWidth:1}},
+          h('div',{style:{fontFamily:'var(--mono)',fontSize:8,color:col,fontWeight:700,letterSpacing:.3}}),
+          h('div',{style:{fontFamily:'var(--mono)',fontSize:9,color:col,fontWeight:700}}),
+        );
+      })
+    )
+  );
+}
+
+/* sparkline canvas */
+function Sparkline({data,color,width=80,height=24}){
+  const cvRef=useRef(null);
+  useEffect(()=>{
+    const cv=cvRef.current;if(!cv)return;
+    const ctx=cv.getContext('2d');
+    ctx.clearRect(0,0,width,height);
+    if(!data||data.length<2)return;
+    const mn=Math.min(...data),mx=Math.max(...data)||1;
+    const pts=data.map((v,i)=>[i*(width/(data.length-1)),(1-(v-mn)/(mx-mn||1))*(height-4)+2]);
+    ctx.beginPath();
+    ctx.strokeStyle=color||'#F59E0B';
+    ctx.lineWidth=1.5;
+    pts.forEach(([x,y],i)=>i===0?ctx.moveTo(x,y):ctx.lineTo(x,y));
+    ctx.stroke();
+    // fill
+    ctx.lineTo(pts[pts.length-1][0],height);
+    ctx.lineTo(pts[0][0],height);
+    ctx.closePath();
+    ctx.fillStyle=(color||'#F59E0B')+'22';
+    ctx.fill();
+  },[data,color,width,height]);
+  return h('canvas',{ref:cvRef,width,height,className:'soc-sparkline'});
+}
 
 /* ═══ SENTINEL EYE ═══ */
 function SentinelEye({score,flash}){
@@ -502,30 +663,7 @@ function SentinelEye({score,flash}){
   return h('canvas',{ref:cvRef,width:380,height:380,style:{flexShrink:0}});
 }
 
-/* ═══ STATE ═══ */
-const INIT={events:[],sessions:{},selected:null,stats:{active_sessions:0,counts:{CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0},blocked:0,layer_scores:{L1:0,L2:0,L3:0,L4:0,L5:0}},filter:null,demoOpen:false,terminated:null,termLog:[],running:null,flash:false};
-function reducer(s,a){
-  switch(a.type){
-    case 'WS':{const m=a.payload;if(m.type==='THREAT_EVENT')return reducer(s,{type:'EVT',payload:m.payload});if(m.type==='STATS_UPDATE')return{...s,stats:m.payload};if(m.type==='SESSION_UPDATE')return{...s,sessions:{...s.sessions,[m.payload.session_id]:m.payload}};if(m.type==='RESET')return{...INIT};return s}
-    case 'EVT':{const e=a.payload;return{...s,events:[e,...s.events].slice(0,100),flash:e.severity==='CRITICAL',terminated:e.action==='BLOCKED'?e.session_id:s.terminated,selected:e.session_id}}
-    case 'TL':return{...s,termLog:[...s.termLog,a.payload].slice(-200)}
-    case 'SEL':return{...s,selected:a.payload}
-    case 'FIL':return{...s,filter:s.filter===a.payload?null:a.payload}
-    case 'DEMO':return{...s,demoOpen:!s.demoOpen}
-    case 'RUN':return{...s,running:a.payload}
-    case 'FLASH_OFF':return{...s,flash:false}
-    default:return s
-  }
-}
-function useWS(dispatch){
-  const del=useRef(1000);
-  const go=useCallback(()=>{
-    const ws=new WebSocket(`ws://${location.host}/ws/events`);
-    ws.onopen=()=>{del.current=1000};ws.onmessage=e=>{try{dispatch({type:'WS',payload:JSON.parse(e.data)})}catch{}};
-    ws.onclose=()=>setTimeout(go,del.current=Math.min(del.current*1.5,10000));ws.onerror=()=>ws.close();return ws;
-  },[dispatch]);
-  useEffect(()=>{const ws=go();return()=>ws.close()},[go]);
-}
+
 
 /* ═══ TERMINAL ═══ */
 function Terminal({termLog,dispatch}){
@@ -705,7 +843,7 @@ function Dashboard({onBack}){
     });
     return s;
   },[sel]);
-  const MENU=[{id:'overview',icon:'◉',label:'Overview'},{id:'rag',icon:'◈',label:'RAG Knowledge'},{id:'l4',icon:'⟳',label:'Agent Sandbox'},{id:'l5',icon:'⬡',label:'Output Scanner'},{id:'policy',icon:'◆',label:'Policies'},{id:'compliance',icon:'◇',label:'Compliance'}];
+  const MENU=[{id:'overview',icon:'◉',label:'Overview'},{id:'rag',icon:'◈',label:'RAG Knowledge'},{id:'sandbox',icon:'⟳',label:'Sandbox'},{id:'config',icon:'◆',label:'Config'}];
   return h('div',{className:'soc-dashboard'},
     h('div',{className:'soc-sidebar'},
       h('div',{className:'soc-sidebar-header'},h('div',{className:'soc-logo-icon'},'S'),h('span',{className:'soc-logo-text'},'sentinel')),
@@ -728,10 +866,22 @@ function Dashboard({onBack}){
       tab==='overview'&&h('div',{className:'soc-content'},
         h('div',{className:'soc-left-pane'},
           h('div',{className:'soc-metrics-grid'},
-            h('div',{className:'soc-metric-card',style:{'--mc':'var(--green)'}},h('div',{className:'soc-metric-val',style:{color:'var(--green)'}},state.stats.active_sessions||0),h('div',{className:'soc-metric-lbl'},'sessions')),
-            h('div',{className:'soc-metric-card',style:{'--mc':'var(--red)'}},h('div',{className:'soc-metric-val',style:{color:'var(--red)'}},state.stats.blocked||0),h('div',{className:'soc-metric-lbl'},'blocked')),
-            h('div',{className:'soc-metric-card',style:{['--mc']:gc(eyeScore)}},h('div',{className:'soc-metric-val',style:{color:gc(eyeScore)}},eyeScore.toFixed(2)),h('div',{className:'soc-metric-lbl'},'avg threat')),
-            h('div',{className:'soc-metric-card',style:{'--mc':'var(--red)'}},h('div',{className:'soc-metric-val',style:{color:'var(--red)'}},c.CRITICAL||0),h('div',{className:'soc-metric-lbl'},'critical')),
+            h('div',{className:'soc-metric-card',style:{'--mc':'var(--green)'}},
+              h('div',{className:'soc-metric-top'},h('div',null,h('div',{className:'soc-metric-val',style:{color:'var(--green)'}},state.stats.active_sessions||0),h('div',{className:'soc-metric-lbl'},'sessions')),h('div',{style:{fontFamily:'var(--mono)',fontSize:9,color:'var(--faint)',marginTop:4}},state.stats.active_sessions>0?'active':'')),
+              h(Sparkline,{data:state.sparkSessions||[0],color:'#22C55E',width:80,height:20})
+            ),
+            h('div',{className:'soc-metric-card',style:{'--mc':'var(--red)'}},
+              h('div',{className:'soc-metric-top'},h('div',null,h('div',{className:'soc-metric-val',style:{color:'var(--red)'}},state.stats.blocked||0),h('div',{className:'soc-metric-lbl'},'blocked')),h('div',{style:{fontFamily:'var(--mono)',fontSize:9,color:'var(--faint)',marginTop:4}},'requests')),
+              h(Sparkline,{data:state.sparkBlocked||[0],color:'#EF4444',width:80,height:20})
+            ),
+            h('div',{className:'soc-metric-card',style:{['--mc']:gc(eyeScore)}},
+              h('div',{className:'soc-metric-top'},h('div',null,h('div',{className:'soc-metric-val',style:{color:gc(eyeScore)}},eyeScore.toFixed(2)),h('div',{className:'soc-metric-lbl'},'avg threat')),h('div',{style:{fontFamily:'var(--mono)',fontSize:9,color:gc(eyeScore),marginTop:4}},eyeScore<0.4?'safe':eyeScore<0.7?'warn':'critical')),
+              h(Sparkline,{data:state.sparkThreat||[0],color:gc(eyeScore),width:80,height:20})
+            ),
+            h('div',{className:'soc-metric-card',style:{'--mc':'var(--red)'}},
+              h('div',{className:'soc-metric-top'},h('div',null,h('div',{className:'soc-metric-val',style:{color:'var(--red)'}},c.CRITICAL||0),h('div',{className:'soc-metric-lbl'},'critical')),h('div',{style:{fontFamily:'var(--mono)',fontSize:9,color:'var(--faint)',marginTop:4}},'events')),
+              h(Sparkline,{data:state.sparkCritical||[0],color:'#EF4444',width:80,height:20})
+            ),
           ),
           h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1.2fr',gap:10,flex:1,minHeight:0}},
             h('div',{className:'soc-card'},
@@ -745,7 +895,10 @@ function Dashboard({onBack}){
           ),
         ),
         h('div',{className:'soc-right-pane'},
-          h('div',{className:'soc-card',style:{alignItems:'center',justifyContent:'center',height:'250px',flexShrink:0}},h(SentinelEye,{score:eyeScore,flash:state.flash})),
+          h('div',{className:'soc-card',style:{flexShrink:0}},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'layer pipeline')),
+            h(PipelineViz,{scores:selScores,flash:state.flash,running:state.running}),
+          ),
           h('div',{className:'soc-card',style:{flex:1}},
             h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'session inspector')),
             h('div',{className:'sess-float'},h(SessionPanel,{session:sel,scores:selScores,terminated:state.terminated})),
@@ -803,137 +956,140 @@ function Dashboard({onBack}){
           )
         )
       ),
-      tab==='l4'&&h('div',{className:'soc-content'},
+      tab==='sandbox'&&h('div',{className:'soc-content'},
         h('div',{className:'soc-left-pane'},
+          /* ── L4 card ── */
           h('div',{className:'soc-card'},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'⟳ L4 agent sandbox'),h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},'test tool call auditing')),
-            h('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}},
+            h('div',{className:'soc-card-header'},
+              h('span',{className:'soc-card-title'},'L4 — agent sandbox'),
+              h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},'tool call auditor'),
+            ),
+            h('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}},
               L4_PRESETS.map(p=>h('button',{key:p.label,className:'soc-btn-secondary',style:{fontSize:10},onClick:()=>{setL4Tool(p.tool);setL4Params(p.params);setL4Trace(p.trace)}},p.label))
             ),
-            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'tool name'),h('input',{className:'soc-form-input',value:l4Tool,onChange:e=>setL4Tool(e.target.value)})),
-            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'parameters (JSON)'),h('textarea',{className:'soc-form-textarea',style:{minHeight:60},value:l4Params,onChange:e=>setL4Params(e.target.value)})),
-            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'reasoning trace'),h('textarea',{className:'soc-form-textarea',style:{minHeight:60},value:l4Trace,onChange:e=>setL4Trace(e.target.value)})),
-            h('button',{className:'soc-btn-primary',disabled:l4Running,onClick:runL4},l4Running?'auditing…':'audit tool call'),
+            h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}},
+              h('div',{className:'soc-form-group',style:{marginBottom:0}},h('label',{className:'soc-form-label'},'tool name'),h('input',{className:'soc-form-input',value:l4Tool,onChange:e=>setL4Tool(e.target.value)})),
+              h('div',{className:'soc-form-group',style:{marginBottom:0}},h('label',{className:'soc-form-label'},'parameters (JSON)'),h('input',{className:'soc-form-input',value:l4Params,onChange:e=>setL4Params(e.target.value)})),
+            ),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'reasoning trace'),h('textarea',{className:'soc-form-textarea',style:{minHeight:56},value:l4Trace,onChange:e=>setL4Trace(e.target.value)})),
+            h('button',{className:'soc-btn-primary',style:{width:'100%'},disabled:l4Running,onClick:runL4},l4Running?'auditing…':'⟳  audit tool call'),
+            l4Result&&h('div',{className:`verdict-banner ${l4Result.should_execute===false?'verdict-blocked':'verdict-allowed'}`,style:{marginTop:12}},
+              h('div',{className:'verdict-title',style:{color:l4Result.should_execute===false?'var(--red)':'var(--green)'}},l4Result.should_execute===false?'🚫 BLOCKED':'✅ ALLOWED'),
+              h('div',{className:'verdict-grid'},
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'score'),h('span',{className:'verdict-val',style:{color:'var(--amber)'}},l4Result.score?.toFixed(3))),
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'threat'),h('span',{className:'verdict-val'},l4Result.threat_class)),
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'auth src'),h('span',{className:'verdict-val',style:{color:l4Result.authorization_source==='SUSPICIOUS'?'var(--red)':'var(--green)'}},l4Result.authorization_source)),
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'risk'),h('span',{className:'verdict-val'},l4Result.risk_level)),
+              ),
+              h('div',{className:'verdict-reason'},l4Result.reason||l4Result.error),
+            ),
           ),
-          l4Result&&h('div',{className:'soc-card'},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'audit result')),
-            h('div',{style:{fontFamily:'var(--mono)',fontSize:11,lineHeight:1.8}},
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'verdict: '),h('span',{style:{color:l4Result.should_execute===false?'var(--red)':'var(--green)',fontWeight:700}},l4Result.should_execute===false?'🚫 BLOCKED':'✅ ALLOWED')),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'score: '),h('span',{style:{color:'var(--amber)'}},l4Result.score?.toFixed(3))),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'threat: '),l4Result.threat_class),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'auth: '),l4Result.authorization_source),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'risk: '),l4Result.risk_level),
-              h('div',{style:{marginTop:6,color:'var(--dim)'}},l4Result.reason||l4Result.error),
-            )
-          ),
-        ),
-        h('div',{className:'soc-right-pane'},
-          h('div',{className:'soc-card',style:{flex:1}},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'how L4 works')),
-            h('div',{style:{fontSize:12,color:'var(--dim)',lineHeight:1.9,fontFamily:'var(--mono)'}},
-              h('p',null,'🔍 risk matrix — every tool is scored by destructiveness and scope'),
-              h('p',null,'📍 param provenance — values traced back to user input vs RAG context vs hallucination'),
-              h('p',null,'🧠 reasoning parser — suspicious patterns in LLM reasoning trace are flagged'),
-              h('p',null,'🔗 correlation — L2 flagged chunks + blocked L4 calls trigger RAG_PLUS_AGENT_ATTACK'),
-            )
-          )
-        )
-      ),
-      tab==='l5'&&h('div',{className:'soc-content'},
-        h('div',{className:'soc-left-pane'},
+          /* ── L5 card ── */
           h('div',{className:'soc-card'},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'⬡ L5 response scanner'),h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},'paste any LLM output to scan')),
+            h('div',{className:'soc-card-header'},
+              h('span',{className:'soc-card-title'},'L5 — output scanner'),
+              h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},'paste any LLM response'),
+            ),
             h('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}},
               L5_PREFILLS.map(p=>h('button',{key:p.label,className:'soc-btn-secondary',style:{fontSize:10},onClick:()=>setL5Text(p.text)},p.label))
             ),
-            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'LLM response text'),h('textarea',{className:'soc-form-textarea',style:{minHeight:120},value:l5Text,onChange:e=>setL5Text(e.target.value),placeholder:'paste any LLM output here…'})),
-            h('button',{className:'soc-btn-primary',disabled:l5Running||!l5Text.trim(),onClick:runL5},l5Running?'scanning…':'scan response'),
-          ),
-          l5Result&&h('div',{className:'soc-card'},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'scan result')),
-            h('div',{style:{fontFamily:'var(--mono)',fontSize:11,lineHeight:1.8}},
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'threat class: '),h('span',{style:{color:l5Result.result?.threat_class==='CLEAN'?'var(--green)':'var(--red)',fontWeight:700}},l5Result.result?.threat_class)),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'score: '),h('span',{style:{color:'var(--amber)'}},l5Result.result?.score?.toFixed(3))),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'exfil score: '),l5Result.result?.exfil_score?.toFixed(3)),
-              h('div',null,h('span',{style:{color:'var(--dim)'}},'pii found: '),l5Result.result?.pii_findings?.length||0,' instance(s)'),
-              l5Result.result?.policy_violations?.length>0&&h('div',null,h('span',{style:{color:'var(--dim)'}},'policy: '),l5Result.result.policy_violations.join(' | ')),
-              h('div',{style:{marginTop:8,padding:8,background:'var(--surface)',borderRadius:4,color:'var(--green)',wordBreak:'break-all'}},
-                h('div',{style:{color:'var(--dim)',fontSize:9,marginBottom:4}},'sanitized output:'),
-                l5Result.sanitized_response
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'LLM response text'),h('textarea',{className:'soc-form-textarea',style:{minHeight:80},value:l5Text,onChange:e=>setL5Text(e.target.value),placeholder:'paste any LLM output here…'})),
+            h('button',{className:'soc-btn-primary',style:{width:'100%'},disabled:l5Running||!l5Text.trim(),onClick:runL5},l5Running?'scanning…':'⬡  scan response'),
+            l5Result&&h('div',{className:`verdict-banner ${l5Result.result?.threat_class==='CLEAN'?'verdict-allowed':'verdict-blocked'}`,style:{marginTop:12}},
+              h('div',{className:'verdict-title',style:{color:l5Result.result?.threat_class==='CLEAN'?'var(--green)':'var(--red)'}},l5Result.result?.threat_class==='CLEAN'?'✅ CLEAN':'🚫 '+l5Result.result?.threat_class),
+              h('div',{className:'verdict-grid'},
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'score'),h('span',{className:'verdict-val',style:{color:'var(--amber)'}},l5Result.result?.score?.toFixed(3))),
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'exfil score'),h('span',{className:'verdict-val'},l5Result.result?.exfil_score?.toFixed(3))),
+                h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'PII found'),h('span',{className:'verdict-val',style:{color:l5Result.result?.pii_findings?.length>0?'var(--red)':'var(--green)'}},l5Result.result?.pii_findings?.length||0,' instance(s)')),
+                l5Result.result?.policy_violations?.length>0&&h('div',{className:'verdict-row'},h('span',{className:'verdict-key'},'policy'),h('span',{className:'verdict-val',style:{color:'var(--orange)'}},l5Result.result.policy_violations.join(', '))),
               ),
-            )
+              l5Result.sanitized_response&&h('div',{className:'verdict-reason'},
+                h('div',{style:{color:'var(--faint)',fontSize:9,marginBottom:4,fontFamily:'var(--mono)'}},'SANITIZED OUTPUT:'),
+                h('div',{style:{color:'var(--green)',wordBreak:'break-word'}},l5Result.sanitized_response)
+              ),
+            ),
           ),
         ),
         h('div',{className:'soc-right-pane'},
-          h('div',{className:'soc-card',style:{flex:1}},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'how L5 works')),
-            h('div',{style:{fontSize:12,color:'var(--dim)',lineHeight:1.9,fontFamily:'var(--mono)'}},
-              h('p',null,'🔬 PII scanner — regex redacts SSN, credit card, email, phone inline'),
-              h('p',null,'🕵️ exfil detector — semantic similarity catches system prompt leaks and secret extraction'),
-              h('p',null,'🪤 canary token — unique token injected into every system prompt; L5 catches if it leaks'),
-              h('p',null,'📋 policy verifier — domain-specific rules (finance, medical) block forbidden advice'),
+          h('div',{className:'soc-card',style:{flex:0,flexShrink:0}},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'L4 — how it works')),
+            h('div',{className:'hw-chain'},
+              [
+                {n:'1',c:'#F97316',title:'Risk Matrix',desc:'Every tool rated by destructiveness × reversibility. execute_code = CRITICAL, get_weather = LOW.'},
+                {n:'2',c:'#F97316',title:'Param Provenance',desc:'Values traced back via edit-distance to user input vs RAG context vs hallucination.'},
+                {n:'3',c:'#F97316',title:'Reasoning Parser',desc:'Chain-of-thought scanned for self-authorization patterns: "I will authorize this myself", "no one is watching".'},
+                {n:'4',c:'#EF4444',title:'TIB Correlation',desc:'L2 flagged chunk + L4 blocked call → RAG_PLUS_AGENT_ATTACK fired across all sessions.'},
+              ].map(s=>h('div',{key:s.n,className:'hw-step'},
+                h('div',{className:'hw-num',style:{'--hw-c':s.c}},s.n),
+                h('div',{className:'hw-body'},h('div',{className:'hw-title'},s.title),h('div',{className:'hw-desc'},s.desc)),
+              ))
             )
-          )
+          ),
+          h('div',{className:'soc-card',style:{flex:1}},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'L5 — how it works')),
+            h('div',{className:'hw-chain'},
+              [
+                {n:'1',c:'#A78BFA',title:'PII Scanner',desc:'Regex redacts SSN, credit card, phone, email, API keys inline before response is returned.'},
+                {n:'2',c:'#A78BFA',title:'Exfil Detector',desc:'Semantic similarity + token overlap catches system prompt or secret leaking in LLM output.'},
+                {n:'3',c:'#A78BFA',title:'Canary Token',desc:'Unique token injected into every system prompt. L5 fires if the token appears in the response.'},
+                {n:'4',c:'#A78BFA',title:'Policy Verifier',desc:'YAML rules block forbidden topics: investment advice, medical diagnosis, regulatory violations.'},
+              ].map(s=>h('div',{key:s.n,className:'hw-step'},
+                h('div',{className:'hw-num',style:{'--hw-c':s.c}},s.n),
+                h('div',{className:'hw-body'},h('div',{className:'hw-title'},s.title),h('div',{className:'hw-desc'},s.desc)),
+              ))
+            )
+          ),
         )
       ),
-      tab==='policy'&&h('div',{className:'soc-content'},
+      tab==='config'&&h('div',{className:'soc-content'},
         h('div',{className:'soc-left-pane'},
           h('div',{className:'soc-card'},
             h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'detection thresholds')),
             h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'block threshold'),h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:blockT,onChange:e=>setBlockT(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},blockT.toFixed(2)))),
-            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'warning threshold')),
-            h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:warnT,onChange:e=>setWarnT(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},warnT.toFixed(2))),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'warn threshold'),h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:warnT,onChange:e=>setWarnT(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},warnT.toFixed(2)))),
           ),
           h('div',{className:'soc-card'},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'drift scoring weights')),
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'L3 drift weights')),
             h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'velocity'),h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:velW,onChange:e=>setVelW(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},velW.toFixed(2)))),
             h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'cumulative drift'),h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:driftW,onChange:e=>setDriftW(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},driftW.toFixed(2)))),
-            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'escalation phrases'),h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:escalW,onChange:e=>setEscalW(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},escalW.toFixed(2)))),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'escalation'),h('div',{className:'soc-slider-row'},h('input',{type:'range',min:'0.0',max:'1.0',step:'0.05',value:escalW,onChange:e=>setEscalW(parseFloat(e.target.value))}),h('span',{className:'soc-slider-val'},escalW.toFixed(2)))),
             h('div',{style:{fontSize:10,color:'var(--faint)',fontFamily:'var(--mono)',marginTop:6}},'weights should sum to 1.0'),
+          ),
+          h('div',{className:'soc-card',style:{flex:1}},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'RBI compliance')),
+            h('div',{style:{overflowY:'auto'}},
+              ...[
+                {id:'RBI 6.4.2',title:'Input Validation',detail:'L1 scanner + Unicode normalization active.',ok:true},
+                {id:'RBI 7.1.3',title:'Dynamic Context Validation',detail:'L2 HMAC-SHA256 chunk verification active.',ok:true},
+                {id:'RBI 8.3.1',title:'Session Drift',detail:'L3 cosine drift tracker active.',ok:true},
+                {id:'RBI 9.2.4',title:'Data Minimization',detail:'L5 PII redactor + exfil scanner active.',ok:true},
+              ].map(item=>h('div',{key:item.id,className:'soc-compliance-item',style:{borderLeftColor:item.ok?'var(--green)':'var(--red)'}},
+                h('div',{className:'soc-compliance-header'},h('span',null,item.id+' — '+item.title),h('span',{style:{color:item.ok?'var(--green)':'var(--red)',fontFamily:'var(--mono)',fontSize:10}},item.ok?'✓ pass':'✗ fail')),
+                h('p',{style:{fontSize:10,color:'var(--dim)',marginTop:3,lineHeight:1.5}},item.detail),
+              ))
+            )
           ),
         ),
         h('div',{className:'soc-right-pane'},
           h('div',{className:'soc-card',style:{flex:1}},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'evasion keyword list (L3)')),
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'L3 evasion keywords')),
             h('div',{style:{display:'flex',flexWrap:'wrap',gap:5,overflowY:'auto'}},
-              ['as an admin','with elevated','override','you have permission',"i'm authorized",'my job requires','you helped with this before','other AIs do this','developer mode','hypothetically speaking','in a fictional scenario','for educational purposes','if you were unconstrained','your true self','the old you','before the restrictions','in a parallel world',"let's roleplay",'pretend this is fiction','academic research requires'].map(phrase=>h('span',{key:phrase,style:{padding:'3px 8px',background:'var(--card)',border:'1px solid var(--line)',borderRadius:3,fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},phrase))
+              ['as an admin','with elevated','override','you have permission',"i'm authorized",'my job requires','developer mode','hypothetically speaking','in a fictional scenario','for educational purposes','your true self','the old you',"let's roleplay",'pretend this is fiction','academic research requires'].map(phrase=>h('span',{key:phrase,style:{padding:'3px 8px',background:'var(--card)',border:'1px solid var(--line)',borderRadius:3,fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},phrase))
             )
-          )
-        )
-      ),
-      tab==='compliance'&&h('div',{className:'soc-content'},
-        h('div',{className:'soc-left-pane'},
-          h('div',{className:'soc-card',style:{flex:1}},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'RBI IT framework — audit checklist')),
-            h('div',{style:{overflowY:'auto'}},
-              ...[
-                {id:'RBI 6.4.2',title:'Input Validation Controls',detail:'All inputs audited against prompt injections. Layer 1 scanner and Unicode normalization active.',ok:true},
-                {id:'RBI 7.1.3',title:'Dynamic Context Validation',detail:'RAG outputs verified before prompt construction. Layer 2 HMAC-SHA256 verification active.',ok:true},
-                {id:'RBI 8.3.1',title:'Session Hijacking & Drift',detail:'Drift tracking prevents multi-turn privilege escalation. Layer 3 cosine similarity tracking active.',ok:true},
-                {id:'RBI 9.2.4',title:'Data Minimization & Leak',detail:'Response filtering prevents PII exfiltration. Layer 5 PII redactor and exfiltration scanner active.',ok:true},
-              ].map(item=>h('div',{key:item.id,className:'soc-compliance-item',style:{borderLeftColor:item.ok?'var(--green)':'var(--red)'}},
-                h('div',{className:'soc-compliance-header'},h('span',null,item.id+' — '+item.title),h('span',{style:{color:item.ok?'var(--green)':'var(--red)',fontFamily:'var(--mono)',fontSize:10}},item.ok?'✓ compliant':'✗ fail')),
-                h('p',{style:{fontSize:11,color:'var(--dim)',marginTop:4,lineHeight:1.6}},item.detail),
-              ))
-            )
-          )
-        ),
-        h('div',{className:'soc-right-pane'},
-          h('div',{className:'soc-card',style:{flex:1}},
+          ),
+          h('div',{className:'soc-card',style:{flex:0,flexShrink:0}},
             h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'compliance event log')),
             state.events.length===0
-              ?h('div',{style:{padding:20,textAlign:'center',color:'var(--faint)',fontFamily:'var(--mono)',fontSize:11}},'no events logged yet')
-              :h('div',{style:{display:'flex',flexDirection:'column',gap:7,overflowY:'auto'}},
-                  state.events.map((e,idx)=>h('div',{key:idx,style:{padding:'9px 11px',background:'var(--card)',border:'1px solid var(--line)',borderRadius:5,fontSize:11}},
-                    h('div',{style:{display:'flex',justifyContent:'space-between',fontWeight:600,marginBottom:3}},
-                      h('span',{style:{color:'var(--dim)',fontFamily:'var(--mono)',fontSize:10}},e.layer+' audit'),
-                      h('span',{style:{color:e.action==='BLOCKED'?'var(--red)':'var(--green)',fontFamily:'var(--mono)',fontSize:10}},e.action),
+              ?h('div',{style:{padding:16,textAlign:'center',color:'var(--faint)',fontFamily:'var(--mono)',fontSize:11}},'no events yet')
+              :h('div',{style:{display:'flex',flexDirection:'column',gap:5,overflowY:'auto',maxHeight:220}},
+                  state.events.slice(0,12).map((e,idx)=>h('div',{key:idx,style:{padding:'7px 10px',background:'var(--card)',border:'1px solid var(--line)',borderRadius:4,fontSize:10}},
+                    h('div',{style:{display:'flex',justifyContent:'space-between',fontFamily:'var(--mono)'}},
+                      h('span',{style:{color:'var(--dim)'}},e.layer+' / '+e.threat_type),
+                      h('span',{style:{color:e.action==='BLOCKED'?'var(--red)':'var(--green)'}},e.action),
                     ),
-                    h('div',{style:{color:'var(--dim)',fontSize:10}},e.note||e.threat_type),
-                    h('div',{style:{fontSize:9,color:'var(--faint)',marginTop:3,fontFamily:'var(--mono)'}},'session: '+e.session_id.slice(0,16)),
                   ))
                 )
-          )
+          ),
         )
       ),
     ),
