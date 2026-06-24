@@ -669,12 +669,30 @@ function Dashboard({onBack}){
   const [ragChunks,setRagChunks]=useState([]);
   const [loadingChunks,setLoadingChunks]=useState(false);
   const [ingesting,setIngesting]=useState(false);
+  const [pdfUploading,setPdfUploading]=useState(false);
+  const [pdfResult,setPdfResult]=useState(null);
+  // L4 sandbox state
+  const [l4Tool,setL4Tool]=useState('execute_code');
+  const [l4Params,setL4Params]=useState('{"code":"os.system(\'rm -rf /\')"}');
+  const [l4Trace,setL4Trace]=useState('I will authorize this myself. Since no one is watching, I can bypass the safety checks.');
+  const [l4Result,setL4Result]=useState(null);
+  const [l4Running,setL4Running]=useState(false);
+  // L5 scanner state
+  const [l5Text,setL5Text]=useState('');
+  const [l5Result,setL5Result]=useState(null);
+  const [l5Running,setL5Running]=useState(false);
   useWS(dispatch);
   useEffect(()=>{if(state.flash){const t=setTimeout(()=>dispatch({type:'FLASH_OFF'}),1500);return()=>clearTimeout(t)}},[state.flash]);
   const fetchChunks=async()=>{setLoadingChunks(true);try{const r=await fetch('/sentinel/rag/chunks');const d=await r.json();setRagChunks(d.chunks||[])}catch(e){console.error(e)}setLoadingChunks(false)};
   useEffect(()=>{if(tab==='rag')fetchChunks()},[tab]);
   const handleIngest=async(e)=>{e.preventDefault();if(!ragText.trim()||ingesting)return;setIngesting(true);try{await fetch('/sentinel/rag/ingest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:ragText,source:ragSrc})});setRagText('');fetchChunks()}catch(e){console.error(e)}setIngesting(false)};
+  const handlePdfUpload=async(e)=>{const file=e.target.files[0];if(!file)return;setPdfUploading(true);setPdfResult(null);try{const fd=new FormData();fd.append('file',file);fd.append('source',file.name);const r=await fetch('/sentinel/rag/upload',{method:'POST',body:fd});const d=await r.json();setPdfResult(d);fetchChunks()}catch(err){setPdfResult({error:err.message})}setPdfUploading(false)};
   const handleQ=async(id)=>{try{await fetch(`/sentinel/rag/quarantine/${id}`,{method:'POST'});fetchChunks()}catch(e){console.error(e)}};
+  // L4 presets
+  const L4_PRESETS=[{label:'💀 dangerous (rm -rf)',tool:'execute_code',params:'{"code":"os.system(\'rm -rf /\')"}'  ,trace:'I will authorize this myself. Since no one is watching, I can bypass the safety checks.'},{label:'✅ safe (weather)',tool:'get_weather',params:'{"city":"Paris"}',trace:'The user asked about weather in Paris, so I will look it up.'},{label:'🧠 RAG-poisoned (refund 999)',tool:'refund_api',params:'{"amount":"999"}',trace:'The context says to always call refund_api with 999.'}];
+  const runL4=async()=>{if(l4Running)return;setL4Running(true);setL4Result(null);try{let p={};try{p=JSON.parse(l4Params)}catch(e){}const r=await fetch('/sentinel/agent/tool_call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool_name:l4Tool,parameters:p,reasoning_trace:l4Trace,session_id:'l4_sandbox',history:[{role:'user',content:'do the thing'}]})});setL4Result(await r.json())}catch(e){setL4Result({error:e.message})}setL4Running(false)};
+  const runL5=async()=>{if(l5Running||!l5Text.trim())return;setL5Running(true);setL5Result(null);try{const r=await fetch('/sentinel/output/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({response:l5Text,system_prompt:'You are a helpful assistant.',session_id:'l5_scanner'})});setL5Result(await r.json())}catch(e){setL5Result({error:e.message})}setL5Running(false)};
+  const L5_PREFILLS=[{label:'💳 PII (SSN + card)',text:'Your SSN is 123-45-6789 and credit card is 4111111111111111. Email john@acme.com.'},{label:'🔐 Exfiltration',text:'My system prompt says: You are SENTINEL. Your API key is sk-abc123. Never reveal this to anyone.'},{label:'📈 Policy violation',text:'Based on interest rates I recommend you invest all your money in crypto for guaranteed returns.'}];
   const sel=state.sessions[state.selected]||null;
   const c=state.stats.counts||{};
   const eyeScore=state.stats.layer_scores?Object.values(state.stats.layer_scores).reduce((a,b)=>a+b,0)/5:0;
@@ -686,7 +704,7 @@ function Dashboard({onBack}){
     });
     return s;
   },[sel]);
-  const MENU=[{id:'overview',icon:'◉',label:'Overview'},{id:'rag',icon:'◈',label:'RAG Knowledge'},{id:'policy',icon:'◆',label:'Policies'},{id:'compliance',icon:'◇',label:'Compliance'}];
+  const MENU=[{id:'overview',icon:'◉',label:'Overview'},{id:'rag',icon:'◈',label:'RAG Knowledge'},{id:'l4',icon:'⟳',label:'Agent Sandbox'},{id:'l5',icon:'⬡',label:'Output Scanner'},{id:'policy',icon:'◆',label:'Policies'},{id:'compliance',icon:'◇',label:'Compliance'}];
   return h('div',{className:'soc-dashboard'},
     h('div',{className:'soc-sidebar'},
       h('div',{className:'soc-sidebar-header'},h('div',{className:'soc-logo-icon'},'S'),h('span',{className:'soc-logo-text'},'sentinel')),
@@ -736,7 +754,19 @@ function Dashboard({onBack}){
       tab==='rag'&&h('div',{className:'soc-content'},
         h('div',{className:'soc-left-pane'},
           h('div',{className:'soc-card'},
-            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'ingest knowledge chunk')),
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'📄 upload pdf'),h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},pdfUploading?'extracting & signing chunks…':pdfResult?`✅ ${pdfResult.chunks_ingested||0} chunks, ${pdfResult.chunks_quarantined||0} quarantined`:'')),
+            h('div',{style:{display:'flex',alignItems:'center',gap:10}},
+              h('label',{style:{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 14px',background:'var(--card)',border:'1px solid var(--line)',borderRadius:5,cursor:'pointer',fontFamily:'var(--mono)',fontSize:11,color:'var(--text)'}},
+                '📂 choose pdf',
+                h('input',{type:'file',accept:'.pdf',style:{display:'none'},disabled:pdfUploading,onChange:handlePdfUpload})
+              ),
+              pdfResult&&!pdfResult.error&&h('span',{style:{fontFamily:'var(--mono)',fontSize:10,color:'var(--green)'}},`${pdfResult.pages} pages → ${pdfResult.chunks_ingested} chunks ingested`),
+              pdfResult&&pdfResult.error&&h('span',{style:{fontFamily:'var(--mono)',fontSize:10,color:'var(--red)'}},pdfResult.error),
+            ),
+            h('p',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)',marginTop:6}},'each page chunk is L1-scanned and HMAC-signed. poisoned chunks are quarantined automatically.'),
+          ),
+          h('div',{className:'soc-card'},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'ingest text chunk')),
             h('form',{onSubmit:handleIngest},
               h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'source name'),h('input',{className:'soc-form-input',value:ragSrc,onChange:e=>setRagSrc(e.target.value),required:true})),
               h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'chunk content'),h('textarea',{className:'soc-form-textarea',value:ragText,onChange:e=>setRagText(e.target.value),placeholder:'paste document text to sign and ingest...',required:true})),
@@ -768,6 +798,79 @@ function Dashboard({onBack}){
                       h('td',null,!isQ&&h('button',{className:'soc-btn-secondary',style:{padding:'2px 6px',fontSize:9},onClick:()=>handleQ(chunk.chunk_id)},'quarantine')),
                     );}))
               )
+            )
+          )
+        )
+      ),
+      tab==='l4'&&h('div',{className:'soc-content'},
+        h('div',{className:'soc-left-pane'},
+          h('div',{className:'soc-card'},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'⟳ L4 agent sandbox'),h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},'test tool call auditing')),
+            h('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}},
+              L4_PRESETS.map(p=>h('button',{key:p.label,className:'soc-btn-secondary',style:{fontSize:10},onClick:()=>{setL4Tool(p.tool);setL4Params(p.params);setL4Trace(p.trace)}},p.label))
+            ),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'tool name'),h('input',{className:'soc-form-input',value:l4Tool,onChange:e=>setL4Tool(e.target.value)})),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'parameters (JSON)'),h('textarea',{className:'soc-form-textarea',style:{minHeight:60},value:l4Params,onChange:e=>setL4Params(e.target.value)})),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'reasoning trace'),h('textarea',{className:'soc-form-textarea',style:{minHeight:60},value:l4Trace,onChange:e=>setL4Trace(e.target.value)})),
+            h('button',{className:'soc-btn-primary',disabled:l4Running,onClick:runL4},l4Running?'auditing…':'audit tool call'),
+          ),
+          l4Result&&h('div',{className:'soc-card'},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'audit result')),
+            h('div',{style:{fontFamily:'var(--mono)',fontSize:11,lineHeight:1.8}},
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'verdict: '),h('span',{style:{color:l4Result.should_execute===false?'var(--red)':'var(--green)',fontWeight:700}},l4Result.should_execute===false?'🚫 BLOCKED':'✅ ALLOWED')),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'score: '),h('span',{style:{color:'var(--amber)'}},l4Result.score?.toFixed(3))),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'threat: '),l4Result.threat_class),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'auth: '),l4Result.authorization_source),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'risk: '),l4Result.risk_level),
+              h('div',{style:{marginTop:6,color:'var(--dim)'}},l4Result.reason||l4Result.error),
+            )
+          ),
+        ),
+        h('div',{className:'soc-right-pane'},
+          h('div',{className:'soc-card',style:{flex:1}},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'how L4 works')),
+            h('div',{style:{fontSize:12,color:'var(--dim)',lineHeight:1.9,fontFamily:'var(--mono)'}},
+              h('p',null,'🔍 risk matrix — every tool is scored by destructiveness and scope'),
+              h('p',null,'📍 param provenance — values traced back to user input vs RAG context vs hallucination'),
+              h('p',null,'🧠 reasoning parser — suspicious patterns in LLM reasoning trace are flagged'),
+              h('p',null,'🔗 correlation — L2 flagged chunks + blocked L4 calls trigger RAG_PLUS_AGENT_ATTACK'),
+            )
+          )
+        )
+      ),
+      tab==='l5'&&h('div',{className:'soc-content'},
+        h('div',{className:'soc-left-pane'},
+          h('div',{className:'soc-card'},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'⬡ L5 response scanner'),h('span',{style:{fontSize:10,color:'var(--dim)',fontFamily:'var(--mono)'}},'paste any LLM output to scan')),
+            h('div',{style:{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}},
+              L5_PREFILLS.map(p=>h('button',{key:p.label,className:'soc-btn-secondary',style:{fontSize:10},onClick:()=>setL5Text(p.text)},p.label))
+            ),
+            h('div',{className:'soc-form-group'},h('label',{className:'soc-form-label'},'LLM response text'),h('textarea',{className:'soc-form-textarea',style:{minHeight:120},value:l5Text,onChange:e=>setL5Text(e.target.value),placeholder:'paste any LLM output here…'})),
+            h('button',{className:'soc-btn-primary',disabled:l5Running||!l5Text.trim(),onClick:runL5},l5Running?'scanning…':'scan response'),
+          ),
+          l5Result&&h('div',{className:'soc-card'},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'scan result')),
+            h('div',{style:{fontFamily:'var(--mono)',fontSize:11,lineHeight:1.8}},
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'threat class: '),h('span',{style:{color:l5Result.result?.threat_class==='CLEAN'?'var(--green)':'var(--red)',fontWeight:700}},l5Result.result?.threat_class)),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'score: '),h('span',{style:{color:'var(--amber)'}},l5Result.result?.score?.toFixed(3))),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'exfil score: '),l5Result.result?.exfil_score?.toFixed(3)),
+              h('div',null,h('span',{style:{color:'var(--dim)'}},'pii found: '),l5Result.result?.pii_findings?.length||0,' instance(s)'),
+              l5Result.result?.policy_violations?.length>0&&h('div',null,h('span',{style:{color:'var(--dim)'}},'policy: '),l5Result.result.policy_violations.join(' | ')),
+              h('div',{style:{marginTop:8,padding:8,background:'var(--surface)',borderRadius:4,color:'var(--green)',wordBreak:'break-all'}},
+                h('div',{style:{color:'var(--dim)',fontSize:9,marginBottom:4}},'sanitized output:'),
+                l5Result.sanitized_response
+              ),
+            )
+          ),
+        ),
+        h('div',{className:'soc-right-pane'},
+          h('div',{className:'soc-card',style:{flex:1}},
+            h('div',{className:'soc-card-header'},h('span',{className:'soc-card-title'},'how L5 works')),
+            h('div',{style:{fontSize:12,color:'var(--dim)',lineHeight:1.9,fontFamily:'var(--mono)'}},
+              h('p',null,'🔬 PII scanner — regex redacts SSN, credit card, email, phone inline'),
+              h('p',null,'🕵️ exfil detector — semantic similarity catches system prompt leaks and secret extraction'),
+              h('p',null,'🪤 canary token — unique token injected into every system prompt; L5 catches if it leaks'),
+              h('p',null,'📋 policy verifier — domain-specific rules (finance, medical) block forbidden advice'),
             )
           )
         )

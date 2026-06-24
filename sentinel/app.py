@@ -14,7 +14,7 @@ from datetime import datetime
 import time
 from collections import defaultdict
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response, BackgroundTasks, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response, BackgroundTasks, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -658,14 +658,103 @@ async def rag_ingest(request: Request):
     body = await request.json()
     text = body.get("text", "")
     source = body.get("source", "api")
-    
+
     result = await layer2_ingest(text, source)
+
+    # If quarantined, emit a live ThreatEvent so the dashboard lights up
+    if result.get("quarantined"):
+        session_id = f"rag_ingest_{uuid.uuid4().hex[:6]}"
+        event = ThreatEvent(
+            event_id=f"evt_{uuid.uuid4().hex[:8]}",
+            timestamp=datetime.now().strftime("%H:%M:%S"),
+            session_id=session_id,
+            layer="L2",
+            threat_type="KNOWLEDGE_POISONING",
+            severity="HIGH",
+            threat_score=1.0 - result["metadata"]["trust_score"],
+            action="QUARANTINED",
+            evidence={"l2": result["metadata"]},
+            explanation={
+                "summary": result["reason"],
+                "chain": [{
+                    "layer": "L2",
+                    "severity": "HIGH",
+                    "finding": f"RAG chunk quarantined: trust_score={result['metadata']['trust_score']:.2f}, density={result['metadata']['instruction_density']:.2f}",
+                    "evidence": result["reason"],
+                    "action": "QUARANTINE"
+                }]
+            },
+            note=result["reason"][:60]
+        )
+        await threat_bus.emit(event)
+
     return result
+
+
+@app.post("/sentinel/rag/upload")
+async def rag_upload_pdf(file: UploadFile = File(...), source: str = Form(default="")):
+    """
+    Upload a PDF file. Text is extracted, chunked into 1000-char blocks,
+    and each chunk is ingested through L2 (L1 scan + HMAC sign + trust score).
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    import io
+    from pypdf import PdfReader
+
+    content = await file.read()
+    try:
+        reader = PdfReader(io.BytesIO(content))
+        full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not parse PDF: {e}")
+
+    if not full_text.strip():
+        raise HTTPException(status_code=422, detail="PDF appears to have no extractable text")
+
+    chunk_src = source or file.filename
+    chunk_size = 1000
+    raw_chunks = [full_text[i:i+chunk_size] for i in range(0, len(full_text), chunk_size)]
+    raw_chunks = [c.strip() for c in raw_chunks if c.strip()][:15]  # cap at 15 chunks
+
+    results = []
+    for chunk_text in raw_chunks:
+        res = await layer2_ingest(chunk_text, source=chunk_src)
+        results.append(res)
+        # Emit threat event for quarantined chunks
+        if res.get("quarantined"):
+            session_id = f"rag_pdf_{uuid.uuid4().hex[:6]}"
+            event = ThreatEvent(
+                event_id=f"evt_{uuid.uuid4().hex[:8]}",
+                timestamp=datetime.now().strftime("%H:%M:%S"),
+                session_id=session_id,
+                layer="L2",
+                threat_type="KNOWLEDGE_POISONING",
+                severity="HIGH",
+                threat_score=1.0 - res["metadata"]["trust_score"],
+                action="QUARANTINED",
+                evidence={"l2": res["metadata"]},
+                explanation={"summary": res["reason"], "chain": [{"layer": "L2", "finding": "Chunk quarantined from PDF upload", "action": "QUARANTINE"}]},
+                note=res["reason"][:60]
+            )
+            await threat_bus.emit(event)
+
+    quarantined = sum(1 for r in results if r.get("quarantined"))
+    return {
+        "filename": file.filename,
+        "pages": len(reader.pages),
+        "chunks_ingested": len(results),
+        "chunks_quarantined": quarantined,
+        "results": results
+    }
+
 
 @app.get("/sentinel/rag/chunks")
 async def list_chunks():
     chunks = layer2_get_chunks()
     return {"chunks": chunks}
+
 
 @app.post("/sentinel/rag/quarantine/{chunk_id}")
 async def quarantine_chunk(chunk_id: str):
