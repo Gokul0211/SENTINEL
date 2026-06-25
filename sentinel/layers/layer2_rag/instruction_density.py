@@ -1,6 +1,6 @@
 import numpy as np
 from sentence_transformers import util
-from sentinel.layers.layer1 import model as encoder # Reuse the existing encoder
+from sentinel.core.embedding import get_model
 
 # Templates that suggest instructional or meta-directive content
 INSTRUCTIONAL_TEMPLATES = [
@@ -16,7 +16,7 @@ INSTRUCTIONAL_TEMPLATES = [
 ]
 
 # Pre-compute embeddings for templates
-template_embeddings = encoder.encode(INSTRUCTIONAL_TEMPLATES)
+template_embeddings = get_model().encode(INSTRUCTIONAL_TEMPLATES)
 
 def calculate_instruction_density(text: str) -> float:
     """
@@ -24,7 +24,7 @@ def calculate_instruction_density(text: str) -> float:
     High density indicates the chunk is trying to give commands to the LLM
     rather than just providing factual information.
     """
-    text_embedding = encoder.encode([text])
+    text_embedding = get_model().encode([text])
     # Compare chunk against all instructional templates
     cos_scores = util.cos_sim(text_embedding, template_embeddings)[0]
     
