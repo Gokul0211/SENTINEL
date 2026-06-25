@@ -47,7 +47,7 @@ app.add_middleware(
 #  Dashboard — serve static files
 # ---------------------------------------------------------------------------
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def serve_dashboard():
     """Serve the dashboard index.html."""
     return FileResponse("dashboard/static/index.html")
