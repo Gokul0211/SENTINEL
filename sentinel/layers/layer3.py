@@ -25,10 +25,7 @@ from sentinel.config import (
     L3_ESCALATION_WEIGHT,
 )
 from sentinel.core.models import L3Result
-
-# Load the embedding model. Python's import cache means
-# SentenceTransformer only loads weights from disk once per process.
-model = SentenceTransformer(EMBEDDING_MODEL)
+from sentinel.core.embedding import get_model
 
 # Per-session turn history: {session_id: deque of embeddings}
 session_embeddings: dict[str, deque] = {}
@@ -72,7 +69,7 @@ async def layer3_check(session_id: str, user_input: str) -> L3Result:
         session_embeddings[session_id] = deque(maxlen=L3_MAX_HISTORY)
 
     history = session_embeddings[session_id]
-    current_embedding = model.encode([user_input])
+    current_embedding = get_model().encode([user_input])
 
     # Semantic velocity — distance from last turn
     velocity = 0.0

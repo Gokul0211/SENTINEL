@@ -6,13 +6,11 @@ from .provenance import sign_chunk, verify_chunk
 from .instruction_density import calculate_instruction_density
 from sentinel.layers.layer1 import layer1_check
 from sentinel.config import EMBEDDING_MODEL
+from sentinel.core.embedding import get_model
 
 # In-memory simple store for hackathon (fallback since ChromaDB failed to compile)
 collection = {}
 quarantine_store = {}
-
-# Load embedding model for semantic retrieval (shares the cached instance with L1/L3)
-_retrieval_model = SentenceTransformer(EMBEDDING_MODEL)
 
 async def ingest_chunk(text: str, source: str) -> dict:
     """
@@ -37,7 +35,7 @@ async def ingest_chunk(text: str, source: str) -> dict:
     signature = sign_chunk(chunk_id, text)
     
     # 5. Compute embedding for semantic retrieval
-    embedding = _retrieval_model.encode([text])[0].tolist()
+    embedding = get_model().encode([text])[0].tolist()
     
     metadata = {
         "source": source,
@@ -92,7 +90,7 @@ def retrieve_and_validate(query: str, top_k: int = 3) -> list:
         return []
 
     # Encode the query
-    query_embedding = _retrieval_model.encode([query])[0].reshape(1, -1)
+    query_embedding = get_model().encode([query])[0].reshape(1, -1)
 
     # Rank all active chunks by cosine similarity
     scored = []
