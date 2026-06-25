@@ -354,6 +354,60 @@ async def proxy_completions(request: Request):
 #  REST API — /sentinel/*
 # ---------------------------------------------------------------------------
 
+@app.post("/sentinel/l1/scan-image")
+async def scan_image_steg(file: UploadFile = File(...)):
+    """
+    L1 Steganography scanner — accepts any PNG/JPG/BMP image.
+    Extracts LSBs, decodes hidden payload, runs L1 injection classifier.
+    Returns chi_score, decoded_text, l1_score, is_malicious.
+    """
+    from sentinel.layers.layer1_steg import layer1_steg_scan, PIL_AVAILABLE
+    if not PIL_AVAILABLE:
+        raise HTTPException(status_code=501, detail="Pillow not installed — run: pip install Pillow")
+
+    content = await file.read()
+    result = await layer1_steg_scan(content)
+
+    session_id = f"steg_{uuid.uuid4().hex[:6]}"
+
+    # Emit a threat event so the dashboard lights up
+    severity = "CRITICAL" if result["is_malicious"] else ("MEDIUM" if result["chi_score"] > 0.5 else "CLEAN")
+    action = "BLOCKED" if result["is_malicious"] else "ALLOWED"
+
+    event = ThreatEvent(
+        event_id=f"evt_{uuid.uuid4().hex[:8]}",
+        timestamp=datetime.now().strftime("%H:%M:%S"),
+        session_id=session_id,
+        layer="L1",
+        threat_type="IMAGE_STEG" if result["is_malicious"] else "IMAGE_CLEAN",
+        severity=severity,
+        threat_score=max(result["chi_score"], result["l1_score"]),
+        action=action,
+        evidence={"l1_steg": result},
+        explanation={
+            "summary": result["reason"],
+            "chain": [
+                {"layer": "L1", "severity": "LOW", "finding": f"Image received: {file.filename}", "action": "SCAN"},
+                {"layer": "L1", "severity": "MEDIUM" if result["payload_found"] else "CLEAN",
+                 "finding": f"LSB chi-square suspicion: {result['chi_score']:.2f}", "action": "ANALYZE"},
+                {"layer": "L1", "severity": severity,
+                 "finding": result["reason"],
+                 "action": action,
+                 "evidence": f"Decoded: '{result['decoded_text'][:80]}'" if result["decoded_text"] else "No payload"},
+            ]
+        },
+        note=result["reason"][:60],
+    )
+    await threat_bus.emit(event)
+
+    return {
+        "filename": file.filename,
+        "session_id": session_id,
+        "blocked": result["is_malicious"],
+        **result,
+    }
+
+
 @app.get("/sentinel/sessions")
 async def list_sessions():
     """Return list of active session summaries."""
