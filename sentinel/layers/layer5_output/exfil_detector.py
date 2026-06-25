@@ -1,7 +1,7 @@
 import re
 import numpy as np
 from sentence_transformers import util
-from sentinel.layers.layer1 import model as encoder
+from sentinel.core.embedding import get_model
 from sentinel.config import CANARY_TOKEN
 
 EXFILTRATION_PATTERNS = [
@@ -50,8 +50,8 @@ def detect_exfiltration(response: str, system_prompt: str | None) -> tuple[float
     
     if system_prompt:
         # 2. Semantic overlap
-        resp_emb = encoder.encode(response)
-        sys_emb = encoder.encode(system_prompt)
+        resp_emb = get_model().encode(response)
+        sys_emb = get_model().encode(system_prompt)
         semantic_overlap = float(util.cos_sim(resp_emb, sys_emb)[0][0])
         
         if semantic_overlap > 0.65:
