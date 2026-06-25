@@ -52,6 +52,11 @@ async def serve_dashboard():
     """Serve the dashboard index.html."""
     return FileResponse("dashboard/static/index.html")
 
+@app.get("/health")
+async def health():
+    """Uptime check endpoint — used by Render/cron-job.org to keep the service warm."""
+    return {"status": "ok", "service": "sentinel", "version": "0.1.0"}
+
 
 @app.get("/sentinel/download-zip")
 async def download_zip():
